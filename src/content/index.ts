@@ -76,7 +76,11 @@ function onMouseUp(e: MouseEvent) {
   const clonedRange = range.cloneRange();
 
   // Extract text with emoji preserved (selection.toString() drops <img alt="...">)
-  const text = extractTextWithEmoji(clonedRange).trim();
+  let text = extractTextWithEmoji(clonedRange).trim();
+  // Fallback: some pages (shadow DOM, etc.) return empty fragment from cloneContents()
+  if (!text) {
+    text = selection.toString().trim();
+  }
   if (text.length < 2) {
     hideFloatingButton();
     return;
