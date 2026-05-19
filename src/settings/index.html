@@ -63,25 +63,6 @@
       display: none; font-size: 14px;
     }
     .toast.visible { display: block; }
-    .toast.error { background: #e74c3c; }
-    .btn-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
-    .inline-error { color: #e74c3c; font-size: 12px; margin-top: 6px; }
-    .model-dropdown { position: relative; }
-    .model-dropdown-list {
-      position: absolute; top: 100%; left: 0; right: 0;
-      max-height: 240px; overflow-y: auto;
-      background: white; border: 1px solid #ddd; border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-      z-index: 100; display: none;
-      margin-top: 2px;
-    }
-    .model-dropdown-list.open { display: block; }
-    .model-dropdown-list .model-option {
-      padding: 8px 10px; cursor: pointer; font-size: 13px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .model-dropdown-list .model-option:hover { background: #f0f4f8; }
-    .model-dropdown-list .model-option.active { background: #e8f0fe; font-weight: 500; }
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -123,7 +104,6 @@
   <h1>⚙ Mouthpiece / 嘴替 设置</h1>
   <div id="settings-content"></div>
   <div class="toast" id="toast"></div>
-
   <script type="module" src="./index.ts"></script>
 </body>
 </html>

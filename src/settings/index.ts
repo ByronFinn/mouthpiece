@@ -37,150 +37,11 @@ function render() {
     showToast("已保存");
   })));
 
-  // Model input with custom dropdown
-  const modelWrapper = document.createElement("div");
-  modelWrapper.className = "model-dropdown";
-
-  const modelInput = document.createElement("input");
-  modelInput.type = "text";
-  modelInput.value = settings.model;
-  modelInput.placeholder = "gpt-4o";
-  let modelSaveTimeout: ReturnType<typeof setTimeout>;
-  modelInput.addEventListener("input", () => {
-    clearTimeout(modelSaveTimeout);
-    modelSaveTimeout = setTimeout(async () => {
-      settings.model = modelInput.value;
-      await saveSettings({ model: modelInput.value });
-      showToast("已保存");
-    }, 500);
-    renderModelDropdown(modelInput.value);
-  });
-  modelInput.addEventListener("focus", () => renderModelDropdown(modelInput.value));
-
-  const dropdownList = document.createElement("div");
-  dropdownList.className = "model-dropdown-list";
-
-  let cachedModels: string[] = [];
-
-  function renderModelDropdown(filter: string) {
-    dropdownList.innerHTML = "";
-    if (cachedModels.length === 0) { dropdownList.classList.remove("open"); return; }
-    const q = filter.toLowerCase();
-    const filtered = cachedModels.filter(m => m.toLowerCase().includes(q));
-    if (filtered.length === 0) { dropdownList.classList.remove("open"); return; }
-    for (const id of filtered) {
-      const opt = document.createElement("div");
-      opt.className = "model-option";
-      if (id === modelInput.value) opt.classList.add("active");
-      opt.textContent = id;
-      opt.addEventListener("mousedown", (e) => {
-        e.preventDefault(); // prevent blur
-        modelInput.value = id;
-        settings.model = id;
-        saveSettings({ model: id });
-        showToast("已保存");
-        dropdownList.classList.remove("open");
-      });
-      dropdownList.appendChild(opt);
-    }
-    dropdownList.classList.add("open");
-  }
-
-  modelInput.addEventListener("blur", () => dropdownList.classList.remove("open"));
-
-  modelWrapper.appendChild(modelInput);
-  modelWrapper.appendChild(dropdownList);
-  apiSection.appendChild(createFormGroup("模型", modelWrapper));
-
-  // Fetch models + Test connection buttons
-  const btnRow = document.createElement("div");
-  btnRow.className = "btn-row";
-
-  const fetchBtn = document.createElement("button");
-  fetchBtn.className = "btn btn-primary btn-sm";
-  fetchBtn.textContent = "获取模型";
-
-  const testBtn = document.createElement("button");
-  testBtn.className = "btn btn-ghost btn-sm";
-  testBtn.textContent = "测试连接";
-
-  const errorDiv = document.createElement("div");
-  errorDiv.className = "inline-error";
-  errorDiv.style.display = "none";
-
-  function clearError() { errorDiv.style.display = "none"; errorDiv.textContent = ""; }
-  function showError(msg: string) { errorDiv.textContent = msg; errorDiv.style.display = "block"; }
-
-  fetchBtn.addEventListener("click", async () => {
-    clearError();
-    if (!settings.apiKey || !settings.baseUrl) {
-      showError("请先填写 API Key 和 Base URL");
-      return;
-    }
-    fetchBtn.disabled = true;
-    fetchBtn.textContent = "获取中...";
-    try {
-      const res = await fetch(`${settings.baseUrl}/models`, {
-        headers: { "Authorization": `Bearer ${settings.apiKey}` },
-      });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        showError(`获取失败 (${res.status}): ${mapError(res.status, errText)}`);
-        return;
-      }
-      const data = await res.json();
-      cachedModels = (data.data || [])
-        .map((m: { id: string }) => m.id)
-        .sort();
-      showToast(`已获取 ${cachedModels.length} 个模型`);
-      renderModelDropdown(modelInput.value);
-    } catch (e: any) {
-      showError(`网络错误: ${e.message || e}`);
-    } finally {
-      fetchBtn.disabled = false;
-      fetchBtn.textContent = "获取模型";
-    }
-  });
-
-  testBtn.addEventListener("click", async () => {
-    clearError();
-    if (!settings.apiKey || !settings.baseUrl || !settings.model) {
-      showError("请先填写 API Key、Base URL 和模型");
-      return;
-    }
-    testBtn.disabled = true;
-    testBtn.textContent = "测试中...";
-    try {
-      const res = await fetch(`${settings.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${settings.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: settings.model,
-          messages: [{ role: "user", content: "hi" }],
-          max_tokens: 1,
-        }),
-      });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        showError(`连接失败 (${res.status}): ${mapError(res.status, errText)}`);
-        return;
-      }
-      showToast("连接成功");
-    } catch (e: any) {
-      showError(`网络错误: ${e.message || e}`);
-    } finally {
-      testBtn.disabled = false;
-      testBtn.textContent = "测试连接";
-    }
-  });
-
-  btnRow.appendChild(fetchBtn);
-  btnRow.appendChild(testBtn);
-  apiSection.appendChild(btnRow);
-  apiSection.appendChild(errorDiv);
+  apiSection.appendChild(createFormGroup("模型", createInput("text", settings.model, "gpt-4o", async (v) => {
+    settings.model = v;
+    await saveSettings({ model: v });
+    showToast("已保存");
+  })));
 
   container.appendChild(apiSection);
 
@@ -214,66 +75,23 @@ function render() {
     }
   })));
 
-  const LANGUAGES = [
-    "中文", "English", "日本語", "한국어", "Français", "Deutsch",
-    "Español", "Português", "Русский", "العربية", "ไทย",
-    "Tiếng Việt", "Bahasa Indonesia", "Italiano", "Nederlands",
-    "Polski", "Türkçe", "हिन्दी", "বাংলা", "فارسی",
-  ];
-
-  const langWrapper = document.createElement("div");
-  langWrapper.className = "model-dropdown";
-
-  const langInput = document.createElement("input");
-  langInput.type = "text";
-  langInput.value = settings.translationLang;
-  langInput.placeholder = "中文";
-  let langSaveTimeout: ReturnType<typeof setTimeout>;
-  langInput.addEventListener("input", () => {
-    clearTimeout(langSaveTimeout);
-    langSaveTimeout = setTimeout(async () => {
-      settings.translationLang = langInput.value;
-      await saveSettings({ translationLang: langInput.value });
-      showToast("已保存");
-    }, 500);
-    renderLangDropdown(langInput.value);
+  const langInput = createInput("text", settings.translationLang, "Chinese", async (v) => {
+    settings.translationLang = v;
+    await saveSettings({ translationLang: v });
+    showToast("已保存");
   });
-  langInput.addEventListener("focus", () => renderLangDropdown(langInput.value));
+  langInput.setAttribute("list", "lang-suggestions");
+  langInput.autocomplete = "off";
+  genSection.appendChild(createFormGroup("我的语言", langInput));
 
-  const langDropdown = document.createElement("div");
-  langDropdown.className = "model-dropdown-list";
-
-  function renderLangDropdown(filter: string) {
-    langDropdown.innerHTML = "";
-    const q = filter.toLowerCase();
-    const filtered = LANGUAGES.filter(l => l.toLowerCase().includes(q));
-    if (filtered.length === 0 || (filtered.length === 1 && filtered[0] === filter)) {
-      langDropdown.classList.remove("open");
-      return;
-    }
-    for (const lang of filtered) {
-      const opt = document.createElement("div");
-      opt.className = "model-option";
-      if (lang === langInput.value) opt.classList.add("active");
-      opt.textContent = lang;
-      opt.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        langInput.value = lang;
-        settings.translationLang = lang;
-        saveSettings({ translationLang: lang });
-        showToast("已保存");
-        langDropdown.classList.remove("open");
-      });
-      langDropdown.appendChild(opt);
-    }
-    langDropdown.classList.add("open");
+  const langDatalist = document.createElement("datalist");
+  langDatalist.id = "lang-suggestions";
+  for (const lang of ["Chinese", "English", "Japanese", "Korean", "French", "German", "Spanish", "Portuguese", "Russian", "Arabic", "Thai", "Vietnamese", "Indonesian"]) {
+    const opt = document.createElement("option");
+    opt.value = lang;
+    langDatalist.appendChild(opt);
   }
-
-  langInput.addEventListener("blur", () => langDropdown.classList.remove("open"));
-
-  langWrapper.appendChild(langInput);
-  langWrapper.appendChild(langDropdown);
-  genSection.appendChild(createFormGroup("我的语言", langWrapper));
+  genSection.appendChild(langDatalist);
 
   const langNote = document.createElement("div");
   langNote.className = "note";
@@ -433,7 +251,7 @@ function createEditForm(preset: Preset): HTMLLIElement {
 
   const note = document.createElement("div");
   note.className = "note";
-  note.textContent = "翻译规则和输出格式会自动附加到提示词末尾，无需手动添加。";
+  note.textContent = "翻译规则和输出格式会自动附加到提示词末尾，无需手动添加。可使用 {{count}} 和 {{translation_lang}} 变量。";
 
   const saveBtn = document.createElement("button");
   saveBtn.className = "btn btn-primary btn-sm";
@@ -468,17 +286,6 @@ function createEditForm(preset: Preset): HTMLLIElement {
 function toggleEdit(presetId: string) {
   editingPresetId = editingPresetId === presetId ? null : presetId;
   render();
-}
-
-function mapError(status: number, _body: string): string {
-  switch (status) {
-    case 401: return "API Key 无效";
-    case 402: return "账户余额不足";
-    case 403: return "无权限访问";
-    case 404: return "模型或接口不存在";
-    case 429: return "请求频率过高，请稍后重试";
-    default: return status >= 500 ? "服务器错误，请稍后重试" : `HTTP ${status}`;
-  }
 }
 
 function showSourcePicker(presets: Preset[]): Promise<string | null> {
