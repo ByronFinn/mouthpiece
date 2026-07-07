@@ -7,10 +7,12 @@ import {
   showFloatingButton,
   hideFloatingButton,
   destroyFloatingButton,
+  positionFloatingButton,
 } from "./ui/floating-button";
 import {
   showResultLayer,
   closeResultLayer,
+  positionResultLayer,
 } from "./ui/result-layer";
 import { generateComments } from "./generate";
 
@@ -45,15 +47,29 @@ function activateIfAllowed(): void {
   active = true;
   createFloatingButton(state, onFloatingBtnClick);
   document.addEventListener("mouseup", onMouseUp, { capture: true });
+  window.addEventListener("scroll", onViewportChange, { passive: true });
+  window.addEventListener("resize", onViewportChange);
 }
 
 /** Remove all UI and unbind events; idempotent. */
 function deactivate(): void {
   active = false;
   document.removeEventListener("mouseup", onMouseUp, { capture: true });
+  window.removeEventListener("scroll", onViewportChange);
+  window.removeEventListener("resize", onViewportChange);
   hideFloatingButton(state);
   closeResultLayer(state);
   destroyFloatingButton(state);
+}
+
+/** Reposition visible UI on scroll/resize using the stored selection anchor. */
+function onViewportChange(): void {
+  if (state.floatingBtn && state.floatingBtn.style.display !== "none") {
+    positionFloatingButton(state);
+  }
+  if (state.resultLayer) {
+    positionResultLayer(state);
+  }
 }
 
 function onMouseUp(e: MouseEvent) {

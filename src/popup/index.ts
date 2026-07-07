@@ -14,6 +14,16 @@ let settings: Settings;
   render();
 })();
 
+// Live-refresh when settings change while the popup is open (e.g. user edits
+// presets in the settings tab — popup updates without reopening).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !("mouthpiece_settings" in changes)) return;
+  loadSettings().then((newSettings) => {
+    settings = newSettings;
+    render();
+  });
+});
+
 function render() {
   const body = document.getElementById("popup-body")!;
 

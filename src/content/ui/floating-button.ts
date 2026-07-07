@@ -12,9 +12,22 @@ export function createFloatingButton(state: ContentState, onClick: (e: MouseEven
 
 export function showFloatingButton(state: ContentState, rect: DOMRect): void {
   if (!state.floatingBtn) return;
-  state.floatingBtn.style.top = `${window.scrollY + rect.bottom + 6}px`;
-  state.floatingBtn.style.left = `${window.scrollX + rect.right + 6}px`;
+  // Record the selection anchor in document coordinates for later repositioning.
+  state.selectionAnchor = {
+    docTop: window.scrollY + rect.top,
+    docLeft: window.scrollX + rect.left,
+    docRight: window.scrollX + rect.right,
+    docBottom: window.scrollY + rect.bottom,
+  };
+  positionFloatingButton(state);
   state.floatingBtn.style.display = "block";
+}
+
+/** Recompute the floating button position from the stored selection anchor. */
+export function positionFloatingButton(state: ContentState): void {
+  if (!state.floatingBtn || !state.selectionAnchor) return;
+  state.floatingBtn.style.top = `${state.selectionAnchor.docBottom + 6}px`;
+  state.floatingBtn.style.left = `${state.selectionAnchor.docRight + 6}px`;
 }
 
 export function hideFloatingButton(state: ContentState): void {
