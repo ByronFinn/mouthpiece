@@ -1,30 +1,25 @@
 import type { Settings, ApiResult, GenerateResponse, Comment } from "./types";
 import { buildSystemPrompt, buildUserMessageText } from "./presets";
+import {
+  mapHttpError,
+  GENERATION_FAILED_PREFIX,
+  REQUEST_FAILED_PREFIX,
+  UNKNOWN_ERROR,
+} from "./errors";
+
+// Re-exported for backwards compatibility — existing callers (and tests) import mapHttpError from "./api".
+export { mapHttpError };
 
 export function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
-export function mapHttpError(status: number): string {
-  switch (status) {
-    case 401: return "API Key 无效，请检查设置";
-    case 402: return "账户余额不足";
-    case 403: return "无权限访问";
-    case 404: return "模型或接口不存在，请检查模型名称";
-    case 429: return "API 配额不足或请求过于频繁，请稍后重试";
-    case 500:
-    case 502:
-    case 503: return "AI 服务暂时不可用，请稍后重试";
-    default: return status >= 500 ? "服务器错误，请稍后重试" : `请求失败 (HTTP ${status})`;
-  }
+export function isUnsupportedJsonObjectError(status: number): boolean {
+  return status === 400 || status === 422;
 }
 
 function authHeaders(apiKey: string): Record<string, string> {
   return { Authorization: `Bearer ${apiKey}` };
-}
-
-export function isUnsupportedJsonObjectError(status: number): boolean {
-  return status === 400 || status === 422;
 }
 
 function formatRetrySuffix(expectedCount: number): string {
@@ -228,7 +223,7 @@ export async function callOpenAI(
       return { ok: false, status: 0, error: "网络连接失败，请检查网络或 Base URL" };
     }
     const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, status: 0, error: `请求失败：${message}` };
+    return { ok: false, status: 0, error: `${REQUEST_FAILED_PREFIX}${message}` };
   }
 }
 

@@ -6,6 +6,7 @@ import {
   renderMultiComments,
   renderError,
 } from "./ui/result-layer";
+import { GENERATION_FAILED_PREFIX, REQUEST_FAILED_PREFIX } from "../shared/errors";
 
 export async function generateComments(state: ContentState): Promise<void> {
   if (state.isLoading || !state.resultLayer) return;
@@ -33,7 +34,7 @@ export async function generateComments(state: ContentState): Promise<void> {
     });
 
     if (!response.ok) {
-      renderError(body, response.error || "生成失败", () => generateComments(state));
+      renderError(body, response.error || GENERATION_FAILED_PREFIX, () => generateComments(state));
     } else if (isMulti && response.multiData) {
       renderMultiComments(body, response.multiData);
     } else if (!isMulti && response.data?.comments?.length) {
@@ -43,7 +44,7 @@ export async function generateComments(state: ContentState): Promise<void> {
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    renderError(body, `请求失败：${message}`, () => generateComments(state));
+    renderError(body, `${REQUEST_FAILED_PREFIX}${message}`, () => generateComments(state));
   } finally {
     state.isLoading = false;
     setLoadingState(state, false);

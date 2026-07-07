@@ -1,5 +1,6 @@
 import { loadSettings } from "../shared/storage";
 import { callWithImageFallback } from "../shared/api";
+import { errorFromResponse, GENERATION_FAILED_PREFIX, UNKNOWN_ERROR } from "../shared/errors";
 import type { GenerateResponse, MultiPresetResult, Settings } from "../shared/types";
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -62,7 +63,7 @@ async function handleMultiMode(
             presetName,
             result: {
               translation: null,
-              comments: [{ content: `生成失败：${response.error || "未知错误"}`, translation: null }],
+              comments: [{ content: errorFromResponse(response), translation: null }],
             },
           } as MultiPresetResult;
         }
@@ -79,7 +80,7 @@ async function handleMultiMode(
           presetName,
           result: {
             translation: null,
-            comments: [{ content: `生成失败：${message}`, translation: null }],
+            comments: [{ content: `${GENERATION_FAILED_PREFIX}${message || UNKNOWN_ERROR}`, translation: null }],
           },
         } as MultiPresetResult;
       }
