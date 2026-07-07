@@ -60,14 +60,14 @@
 - **Arch reviewed by**: `/improve-architecture` (2026-07-07) — 9 findings (Blocking: 0, High: 2, Medium: 4, Low: 3); F-02/F-04 转入 #5
 - **Sliced by**: `/story` → Child Issues below
 - **Sliced into**:
-  - #TBD1 — [PRD-0001] mergePresets 副作用纯化 (AFK)
-  - #TBD2 — [PRD-0001] CONTEXT.md 概念漂移修正 (AFK)
-  - #TBD3 — [PRD-0001] 通用下拉组件复用 (AFK, blocked by #TBD1)
-  - #TBD4 — [PRD-0001] 错误消息集中 (AFK, blocked by #TBD3)
-  - #TBD5 — [PRD-0001] generateId 模块归属 (AFK)
-  - #TBD6 — [PRD-0001] settings/popup 状态封装 (AFK, blocked by #8)
+  - #11 — [PRD-0001] mergePresets 副作用纯化 (AFK)
+  - #12 — [PRD-0001] CONTEXT.md 概念漂移修正 (AFK)
+  - #13 — [PRD-0001] generateId 模块归属 (AFK)
+  - #14 — [PRD-0001] 通用下拉组件复用 (AFK, blocked by #11)
+  - #15 — [PRD-0001] 错误消息集中 (AFK, blocked by #14)
+  - #16 — [PRD-0001] settings/popup 状态封装 (AFK, blocked by #8)
 - **New terms**: Content Framing（替代 Safety Prefix）
 
 ## Issue
 
-（待创建父 Issue 后回填）
+#10
