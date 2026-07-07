@@ -6,6 +6,7 @@ import {
   createFloatingButton,
   showFloatingButton,
   hideFloatingButton,
+  destroyFloatingButton,
 } from "./ui/floating-button";
 import {
   showResultLayer,
@@ -14,24 +15,46 @@ import {
 import { generateComments } from "./generate";
 
 const state = new ContentState();
+let active = false;
 
 (async () => {
   state.settings = await loadSettings();
-  if (!state.settings.apiKey) return;
-
-  state.currentPresetId = state.settings.selectedPresetIds[0] || "critic";
-  createFloatingButton(state, onFloatingBtnClick);
-  document.addEventListener("mouseup", onMouseUp, { capture: true });
+  activateIfAllowed();
 })();
 
 chrome.storage.onChanged.addListener((_changes, area) => {
-  if (area === "local") {
-    loadSettings().then((newSettings) => {
-      state.settings = newSettings;
-      state.currentPresetId = newSettings.selectedPresetIds[0] || "critic";
-    });
-  }
+  if (area !== "local") return;
+  loadSettings().then((newSettings) => {
+    const wasActive = active;
+    state.settings = newSettings;
+    state.currentPresetId = newSettings.selectedPresetIds[0] || "critic";
+
+    if (newSettings.enabled && newSettings.apiKey) {
+      activateIfAllowed();
+    } else if (wasActive) {
+      // Disabled or key cleared — tear down everything and stop responding.
+      deactivate();
+    }
+  });
 });
+
+/** Bind UI only when enabled && apiKey; idempotent. */
+function activateIfAllowed(): void {
+  if (active) return;
+  if (!state.settings || !state.settings.enabled || !state.settings.apiKey) return;
+  active = true;
+  createFloatingButton(state, onFloatingBtnClick);
+  document.addEventListener("mouseup", onMouseUp, { capture: true });
+}
+
+/** Remove all UI and unbind events; idempotent. */
+function deactivate(): void {
+  active = false;
+  document.removeEventListener("mouseup", onMouseUp, { capture: true });
+  hideFloatingButton(state);
+  closeResultLayer(state);
+  destroyFloatingButton(state);
+}
 
 function onMouseUp(e: MouseEvent) {
   if (

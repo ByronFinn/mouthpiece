@@ -20,3 +20,11 @@ export function showFloatingButton(state: ContentState, rect: DOMRect): void {
 export function hideFloatingButton(state: ContentState): void {
   if (state.floatingBtn) state.floatingBtn.style.display = "none";
 }
+
+/** Fully remove the floating button from the DOM (called on deactivation). */
+export function destroyFloatingButton(state: ContentState): void {
+  if (state.floatingBtn) {
+    state.floatingBtn.remove();
+    state.floatingBtn = null;
+  }
+}

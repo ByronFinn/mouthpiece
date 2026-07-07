@@ -196,5 +196,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, "apiKey"> = {
   repliesPerStyle: 3,
   presets: [...BUILT_IN_PRESETS],
   selectedPresetIds: ["critic"],
+  // New installs are opt-in — no content script until the user enables.
+  enabled: false,
 };
 

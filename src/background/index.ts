@@ -1,7 +1,22 @@
 import { loadSettings } from "../shared/storage";
 import { callWithImageFallback } from "../shared/api";
 import { errorFromResponse, GENERATION_FAILED_PREFIX, UNKNOWN_ERROR } from "../shared/errors";
+import { syncContentScriptRegistration } from "./registration";
 import type { GenerateRequest, GenerateResponse, MultiPresetResult, Settings } from "../shared/types";
+
+// SW startup: sync registration to current enabled/apiKey state.
+syncContentScriptRegistration().catch((err: unknown) => {
+  console.error("[mouthpiece] content-script sync failed:", err);
+});
+
+// Re-sync whenever settings change (enabled toggle or apiKey).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (!("mouthpiece_settings" in changes)) return;
+  syncContentScriptRegistration().catch((err: unknown) => {
+    console.error("[mouthpiece] content-script sync failed:", err);
+  });
+});
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "generate") {

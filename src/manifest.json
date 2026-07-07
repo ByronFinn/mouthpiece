@@ -3,8 +3,8 @@
   "name": "Mouthpiece / 嘴替",
   "version": "0.0.1",
   "description": "Generate multi-style comments for selected text — BYOK OpenAI-compatible",
-  "permissions": ["activeTab", "storage"],
-  "host_permissions": ["https://*/"],
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -25,9 +25,8 @@
   "options_page": "src/settings/index.html",
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/index.ts"],
-      "css": ["src/content/content.css"]
+      "matches": ["https://mouthpiece.invalid/"],
+      "js": ["src/content/index.ts"]
     }
   ]
 }

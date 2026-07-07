@@ -27,7 +27,7 @@ describe("sendGenerateMessage", () => {
       generationMode: "single",
     };
     const expected = { ok: true, status: 200, data: { translation: null, comments: [] } };
-    vi.mocked(chrome.runtime.sendMessage).mockResolvedValueOnce(expected);
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValueOnce(expected as never);
 
     const result = await sendGenerateMessage(request);
 

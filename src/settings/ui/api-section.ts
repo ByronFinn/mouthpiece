@@ -8,10 +8,39 @@ export function renderApiSection(settings: Settings): HTMLDivElement {
   apiSection.innerHTML = `<h2>API 配置</h2>`;
 
   apiSection.appendChild(createFormGroup("API Key", createInput("password", settings.apiKey, "sk-...", async (v) => {
+    const wasEmpty = !settings.apiKey;
     settings.apiKey = v;
-    await saveSettings({ apiKey: v });
-    showToast("已保存");
+    // First-time key entry auto-enables the extension and shows a one-time toast.
+    if (wasEmpty && v) {
+      settings.enabled = true;
+      await saveSettings({ apiKey: v, enabled: true });
+      showToast("嘴替已启用");
+    } else {
+      await saveSettings({ apiKey: v });
+      showToast("已保存");
+    }
   })));
+
+  const enabledToggle = document.createElement("input");
+  enabledToggle.type = "checkbox";
+  enabledToggle.id = "mp-enabled-toggle";
+  enabledToggle.checked = settings.enabled;
+  enabledToggle.addEventListener("change", async () => {
+    settings.enabled = enabledToggle.checked;
+    await saveSettings({ enabled: enabledToggle.checked });
+    showToast(enabledToggle.checked ? "已启用" : "已关闭");
+  });
+  const enabledLabel = document.createElement("label");
+  enabledLabel.htmlFor = "mp-enabled-toggle";
+  enabledLabel.textContent = "启用嘴替（在网页上选中文本时显示浮动按钮）";
+  const enabledRow = document.createElement("div");
+  enabledRow.className = "form-group";
+  enabledRow.style.display = "flex";
+  enabledRow.style.alignItems = "center";
+  enabledRow.style.gap = "8px";
+  enabledRow.appendChild(enabledToggle);
+  enabledRow.appendChild(enabledLabel);
+  apiSection.appendChild(enabledRow);
 
   apiSection.appendChild(createFormGroup("Base URL", createInput("text", settings.baseUrl, "https://api.openai.com/v1", async (v) => {
     settings.baseUrl = v;

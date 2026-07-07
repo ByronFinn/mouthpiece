@@ -21,6 +21,7 @@ const baseSettings: Settings = {
   repliesPerStyle: 2,
   presets: [...BUILT_IN_PRESETS],
   selectedPresetIds: ["critic"],
+  enabled: true,
 };
 
 function makeComment(content: string) {

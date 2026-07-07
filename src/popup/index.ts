@@ -31,6 +31,20 @@ function render() {
     return;
   }
 
+  if (!settings.enabled) {
+    body.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "no-key";
+    div.textContent = "嘴替未启用。在网页上选中文本后将不会显示浮动按钮。";
+    const link = document.createElement("a");
+    link.textContent = "打开设置启用";
+    link.addEventListener("click", () => chrome.runtime.openOptionsPage());
+    div.appendChild(document.createElement("br"));
+    div.appendChild(link);
+    body.appendChild(div);
+    return;
+  }
+
   body.innerHTML = "";
 
   const modeLabel = document.createElement("div");

@@ -17,6 +17,8 @@ export interface Settings {
   repliesPerStyle: number;
   presets: Preset[];
   selectedPresetIds: string[];
+  /** Master on/off switch for content-script injection. New installs default false. */
+  enabled: boolean;
 }
 
 export interface Comment {

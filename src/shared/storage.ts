@@ -10,6 +10,11 @@ export async function loadSettings(): Promise<Settings> {
   // Merge with defaults, ensuring built-in presets are always present
   const presets = mergePresets(stored.presets);
 
+  // Migration: existing users who already configured a key are assumed to want
+  // the extension active. New installs (no stored `enabled`, no key) stay opt-in.
+  const hasStoredEnabledFlag = "enabled" in stored;
+  const migratedEnabled = !hasStoredEnabledFlag && !!stored.apiKey;
+
   return {
     apiKey: stored.apiKey || "",
     baseUrl: stored.baseUrl || DEFAULT_SETTINGS.baseUrl,
@@ -19,6 +24,7 @@ export async function loadSettings(): Promise<Settings> {
     repliesPerStyle: stored.repliesPerStyle || DEFAULT_SETTINGS.repliesPerStyle,
     presets,
     selectedPresetIds: stored.selectedPresetIds || DEFAULT_SETTINGS.selectedPresetIds,
+    enabled: migratedEnabled || !!stored.enabled,
   };
 }
 
