@@ -1,5 +1,6 @@
 import type { ApiResult, MultiPresetResult } from "../../shared/types";
 import type { ContentState } from "../state";
+import { getShadowRoot } from "./shadow-host";
 
 export function showResultLayer(
   state: ContentState,
@@ -71,21 +72,28 @@ export function showResultLayer(
   resultLayer.appendChild(body);
   resultLayer.appendChild(footer);
 
-  if (state.currentRect) {
-    const top = window.scrollY + state.currentRect.bottom + 10;
-    const left = Math.min(
-      window.scrollX + state.currentRect.right - 380,
-      window.scrollX + window.innerWidth - 400
-    );
-    resultLayer.style.top = `${Math.max(top, window.scrollY + 10)}px`;
-    resultLayer.style.left = `${Math.max(left, window.scrollX + 10)}px`;
-  }
+  positionResultLayer(state);
 
-  document.body.appendChild(overlay);
-  document.body.appendChild(resultLayer);
+  const root = getShadowRoot();
+  root.appendChild(overlay);
+  root.appendChild(resultLayer);
 
   overlay.classList.add("visible");
   resultLayer.classList.add("visible");
+}
+
+/**
+ * Recompute the result layer position from the stored selection anchor.
+ * Keeps the layer anchored to the selection in document coordinates while
+ * clamping it into the viewport on scroll/resize.
+ */
+export function positionResultLayer(state: ContentState): void {
+  if (!state.resultLayer || !state.selectionAnchor) return;
+  const a = state.selectionAnchor;
+  const top = a.docBottom + 10;
+  const left = Math.min(a.docRight - 380, window.scrollX + window.innerWidth - 400);
+  state.resultLayer.style.top = `${Math.max(top, window.scrollY + 10)}px`;
+  state.resultLayer.style.left = `${Math.max(left, window.scrollX + 10)}px`;
 }
 
 export function closeResultLayer(state: ContentState): void {

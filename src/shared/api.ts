@@ -1,11 +1,6 @@
 import type { Settings, ApiResult, GenerateResponse, Comment } from "./types";
 import { buildSystemPrompt, buildUserMessageText } from "./presets";
-import {
-  mapHttpError,
-  GENERATION_FAILED_PREFIX,
-  REQUEST_FAILED_PREFIX,
-  UNKNOWN_ERROR,
-} from "./errors";
+import { mapHttpError, REQUEST_FAILED_PREFIX } from "./errors";
 
 // Re-exported for backwards compatibility — existing callers (and tests) import mapHttpError from "./api".
 export { mapHttpError };
@@ -62,7 +57,8 @@ function buildChatBody(
 
 async function postChatCompletion(
   settings: Settings,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<{ ok: true; raw: string } | { ok: false; status: number }> {
   const url = `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`;
   const res = await fetch(url, {
@@ -72,6 +68,7 @@ async function postChatCompletion(
       ...authHeaders(settings.apiKey),
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) {
@@ -89,14 +86,16 @@ async function generateWithJsonMode(
   userText: string,
   images: string[],
   expectedCount: number,
-  useJsonObject: boolean
+  useJsonObject: boolean,
+  signal?: AbortSignal
 ): Promise<GenerateResponse | "unsupported_json_object"> {
   let text = userText;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await postChatCompletion(
       settings,
-      buildChatBody(settings, systemPrompt, buildContentParts(text, images), useJsonObject)
+      buildChatBody(settings, systemPrompt, buildContentParts(text, images), useJsonObject),
+      signal
     );
 
     if (!result.ok) {
@@ -176,7 +175,8 @@ export async function callOpenAI(
   settings: Settings,
   text: string,
   images: string[],
-  presetId: string
+  presetId: string,
+  signal?: AbortSignal
 ): Promise<GenerateResponse> {
   const preset = settings.presets.find(p => p.id === presetId);
   if (!preset) {
@@ -199,7 +199,8 @@ export async function callOpenAI(
       userText,
       images,
       expectedCount,
-      true
+      true,
+      signal
     );
 
     if (jsonModeResult !== "unsupported_json_object") {
@@ -212,13 +213,18 @@ export async function callOpenAI(
       userText,
       images,
       expectedCount,
-      false
+      false,
+      signal
     );
     if (fallbackResult === "unsupported_json_object") {
       return { ok: false, status: 0, error: "无法解析 AI 回复" };
     }
     return fallbackResult;
   } catch (err: unknown) {
+    // Aborted requests are expected (user clicked "换一批" or disabled the extension).
+    if (err instanceof DOMException && err.name === "AbortError") {
+      return { ok: false, status: 0, error: "已取消" };
+    }
     if (err instanceof TypeError && err.message.includes("fetch")) {
       return { ok: false, status: 0, error: "网络连接失败，请检查网络或 Base URL" };
     }
@@ -231,14 +237,15 @@ export async function callWithImageFallback(
   settings: Settings,
   text: string,
   images: string[],
-  presetId: string
+  presetId: string,
+  signal?: AbortSignal
 ): Promise<GenerateResponse> {
-  let response = await callOpenAI(settings, text, images, presetId);
+  let response = await callOpenAI(settings, text, images, presetId, signal);
   if (!response.ok && images.length > 0) {
-    response = await callOpenAI(settings, text, [], presetId);
+    response = await callOpenAI(settings, text, [], presetId, signal);
   }
-  if (response.ok && response.data) {
-    response.data = sanitizeApiResult(response.data);
+  if (response.ok && "data" in response) {
+    response = { ...response, data: sanitizeApiResult(response.data) };
   }
   return response;
 }
@@ -289,14 +296,18 @@ export function parseResponse(raw: string): ApiResult | null {
   try {
     const parsed = JSON.parse(raw);
     if (isValidResult(parsed)) return parsed;
-  } catch {}
+  } catch {
+    // Not pure JSON — try code-block extraction next.
+  }
 
   const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) {
     try {
       const parsed = JSON.parse(codeBlockMatch[1]);
       if (isValidResult(parsed)) return parsed;
-    } catch {}
+    } catch {
+      // Code block wasn't valid JSON — fall through to brace extraction.
+    }
   }
 
   const firstBrace = raw.indexOf("{");
@@ -305,7 +316,9 @@ export function parseResponse(raw: string): ApiResult | null {
     try {
       const parsed = JSON.parse(raw.substring(firstBrace, lastBrace + 1));
       if (isValidResult(parsed)) return parsed;
-    } catch {}
+    } catch {
+      // All parse strategies exhausted — caller will handle null.
+    }
   }
 
   return null;

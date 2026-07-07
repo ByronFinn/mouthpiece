@@ -32,10 +32,6 @@ describe("mapHttpError", () => {
 });
 
 describe("errorFromResponse", () => {
-  it("returns empty string for a successful response", () => {
-    expect(errorFromResponse({ ok: true, status: 200, data: { translation: null, comments: [] } })).toBe("");
-  });
-
   it("uses response.error when present", () => {
     const msg = errorFromResponse({ ok: false, status: 500, error: "boom" });
     expect(msg).toBe(`${GENERATION_FAILED_PREFIX}boom`);
@@ -43,11 +39,6 @@ describe("errorFromResponse", () => {
 
   it("falls back to UNKNOWN_ERROR when error is empty", () => {
     const msg = errorFromResponse({ ok: false, status: 0, error: "" });
-    expect(msg).toBe(`${GENERATION_FAILED_PREFIX}${UNKNOWN_ERROR}`);
-  });
-
-  it("falls back to UNKNOWN_ERROR when error is omitted", () => {
-    const msg = errorFromResponse({ ok: false, status: 0 });
     expect(msg).toBe(`${GENERATION_FAILED_PREFIX}${UNKNOWN_ERROR}`);
   });
 });

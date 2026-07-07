@@ -17,6 +17,8 @@ export interface Settings {
   repliesPerStyle: number;
   presets: Preset[];
   selectedPresetIds: string[];
+  /** Master on/off switch for content-script injection. New installs default false. */
+  enabled: boolean;
 }
 
 export interface Comment {
@@ -43,10 +45,17 @@ export interface MultiPresetResult {
   result: ApiResult;
 }
 
-export interface GenerateResponse {
-  ok: boolean;
-  status: number;
-  data?: ApiResult;
-  multiData?: MultiPresetResult[];
-  error?: string;
+/**
+ * Discriminated union over `ok`. Constructors must set exactly one of the
+ * success payloads (`data` for single-mode, `multiData` for multi-mode);
+ * consumers narrow with `"multiData" in response` after checking `ok`.
+ */
+export type GenerateResponse =
+  | { ok: true; status: number; data: ApiResult }
+  | { ok: true; status: number; multiData: MultiPresetResult[] }
+  | { ok: false; status: number; error: string };
+
+/** Type guard: narrows a GenerateResponse to its failure variant. */
+export function isFailedResponse(r: GenerateResponse): r is Extract<GenerateResponse, { ok: false }> {
+  return !r.ok;
 }

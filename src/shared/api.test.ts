@@ -21,6 +21,7 @@ const baseSettings: Settings = {
   repliesPerStyle: 2,
   presets: [...BUILT_IN_PRESETS],
   selectedPresetIds: ["critic"],
+  enabled: true,
 };
 
 function makeComment(content: string) {
@@ -162,7 +163,8 @@ describe("callOpenAI", () => {
     const result = await callOpenAI(baseSettings, "hello", [], "critic");
 
     expect(result.ok).toBe(true);
-    expect(result.data?.comments).toHaveLength(2);
+    if (!result.ok || !("data" in result)) throw new Error("expected single-mode success");
+    expect(result.data.comments).toHaveLength(2);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body.response_format).toEqual({ type: "json_object" });
   });
@@ -233,7 +235,8 @@ describe("callOpenAI", () => {
     const result = await callOpenAI(baseSettings, "hello", [], "critic");
 
     expect(result.ok).toBe(true);
-    expect(result.data?.comments).toHaveLength(2);
+    if (!result.ok || !("data" in result)) throw new Error("expected single-mode success");
+    expect(result.data.comments).toHaveLength(2);
   });
 
   it("returns a centralized REQUEST_FAILED_PREFIX message when fetch rejects", async () => {
@@ -243,6 +246,7 @@ describe("callOpenAI", () => {
     const result = await callOpenAI(baseSettings, "hello", [], "critic");
 
     expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected failure");
     expect(result.error).toContain("请求失败：");
     expect(result.error).toContain("network down");
   });

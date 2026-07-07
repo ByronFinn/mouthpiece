@@ -10,4 +10,10 @@ export class ContentState {
   currentPresetId = "";
   isLoading = false;
   settings: Settings | null = null;
+  /**
+   * Selection anchor in document coordinates (computed once at mouseup time as
+   * scrollY/scrollX + viewport rect). Used to reposition UI on scroll/resize
+   * without re-querying the (possibly stale) selection.
+   */
+  selectionAnchor: { docTop: number; docLeft: number; docRight: number; docBottom: number } | null = null;
 }

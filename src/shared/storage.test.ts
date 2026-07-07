@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { mergePresets } from "./storage";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mergePresets, loadSettings } from "./storage";
 import { BUILT_IN_PRESETS } from "./presets";
 
 describe("mergePresets", () => {
@@ -40,5 +40,50 @@ describe("mergePresets", () => {
     // Result is a new array (built-ins were appended to the copy, not the input)
     expect(result).not.toBe(input);
     expect(result.length).toBeGreaterThan(input.length);
+  });
+});
+
+describe("loadSettings enabled migration", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "chrome",
+      {
+        storage: {
+          local: {
+            get: vi.fn(),
+          },
+        },
+      },
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function mockStored(value: unknown): void {
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce(value as never);
+  }
+
+  it("defaults enabled to false for fresh install (no stored data)", async () => {
+    mockStored({});
+    const s = await loadSettings();
+    expect(s.enabled).toBe(false);
+  });
+
+  it("migrates existing users with a key to enabled=true", async () => {
+    // No stored `enabled` flag, but apiKey present → migrate.
+    mockStored({ mouthpiece_settings: { apiKey: "sk-existing" } });
+    const s = await loadSettings();
+    expect(s.enabled).toBe(true);
+    expect(s.apiKey).toBe("sk-existing");
+  });
+
+  it("respects an explicitly stored enabled=false", async () => {
+    mockStored({
+      mouthpiece_settings: { apiKey: "sk-existing", enabled: false },
+    });
+    const s = await loadSettings();
+    expect(s.enabled).toBe(false);
   });
 });
