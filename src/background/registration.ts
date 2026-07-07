@@ -1,13 +1,21 @@
 import { loadSettings } from "../shared/storage";
 
 const SCRIPT_ID = "mouthpiece-content";
+/**
+ * Fixed path of the standalone content-script bundle produced by the separate
+ * Vite build output (see vite.config.ts). Must be a classic (IIFE) script
+ * relative to the extension root.
+ */
+const CONTENT_JS = "content.js";
 
 /**
  * Ensures the dynamic content script is registered or unregistered based on
  * `enabled && apiKey`. Called at SW startup and whenever settings change.
  *
- * Per ADR 0001, the manifest carries a placeholder match (mouthpiece.invalid)
- * so Chrome never injects on real pages; we register the actual script here.
+ * Per ADR 0001, the manifest carries NO content_scripts — Chrome never injects
+ * on real pages automatically. The Service Worker registers `content.js`
+ * dynamically here, so injection happens only when the user has enabled the
+ * extension AND configured an API key.
  */
 export async function syncContentScriptRegistration(): Promise<void> {
   const settings = await loadSettings();
@@ -17,16 +25,10 @@ export async function syncContentScriptRegistration(): Promise<void> {
   const isRegistered = existing.some((s) => s.id === SCRIPT_ID);
 
   if (shouldRun && !isRegistered) {
-    const manifest = chrome.runtime.getManifest();
-    // Manifest placeholder lists the content js path; reuse it so the path stays
-    // declared in one place.
-    const placeholder = (manifest.content_scripts?.[0]) as { js?: string[] } | undefined;
-    const js = placeholder?.js ?? ["src/content/index.ts"];
-
     await chrome.scripting.registerContentScripts([
       {
         id: SCRIPT_ID,
-        js,
+        js: [CONTENT_JS],
         matches: ["<all_urls>"],
         runAt: "document_idle",
         allFrames: false,
@@ -36,3 +38,4 @@ export async function syncContentScriptRegistration(): Promise<void> {
     await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] });
   }
 }
+

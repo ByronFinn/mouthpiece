@@ -22,11 +22,5 @@
     "service_worker": "src/background/index.ts",
     "type": "module"
   },
-  "options_page": "src/settings/index.html",
-  "content_scripts": [
-    {
-      "matches": ["https://mouthpiece.invalid/"],
-      "js": ["src/content/index.ts"]
-    }
-  ]
+  "options_page": "src/settings/index.html"
 }

@@ -23,8 +23,9 @@ Chrome MV3 提供了 `chrome.scripting` API，允许 Service Worker 在运行时
 
 - `Settings.enabled` 字段控制注入开关；新装默认 `false`，老用户（已配置 Key）自动迁移为 `true`。
 - 首次保存 API Key 时自动置 `enabled = true` 并显示一次性提示。
-- `manifest.json` 的 `content_scripts` 占位一个不可达匹配（`mouthpiece.invalid`），保持 manifest 合法但不实际注入；新增 `scripting` 权限。
-- Service Worker 从 `chrome.runtime.getManifest()` 读取 js 路径，仅在 `enabled && apiKey` 时调用 `chrome.scripting.registerContentScripts`，否则 `unregisterContentScripts`。
+- `manifest.json` **不声明任何 `content_scripts`**；新增 `scripting` 权限。
+- Content script 由**独立的 Vite build**（`vite.content.config.ts`，IIFE 格式、`inlineDynamicImports`）输出到固定路径 `dist/content.js`。它**不**经过 `@crxjs/vite-plugin` 管理，因为 CRXJS 的 content loader（dynamic `import()` + `onExecute` HMR 包装）与 `chrome.scripting.registerContentScripts` 不兼容——后者只接受 classic（非 ES module）脚本。`npm run build` 串行执行两次 build（主扩展 + content bundle）。
+- Service Worker 仅在 `enabled && apiKey` 时用 `chrome.scripting.registerContentScripts` 注册 `content.js`（匹配 `<all_urls>`、`document_idle`），否则 `unregisterContentScripts`。
 - 设置页提供「启用嘴替」开关；Popup/Settings 在无 Key 或未启用时显示引导文案。
 - Content Script 监听 `chrome.storage.onChanged`：`enabled = false` 或 `apiKey` 清空时立即清理 UI 并解绑事件。
 
@@ -41,6 +42,8 @@ Chrome MV3 提供了 `chrome.scripting` API，允许 Service Worker 在运行时
 * 增加状态同步复杂度：SW、Settings、Popup、已注入 Content 之间需围绕 `enabled` + `apiKey` 协同。
 * 需要可靠的 storage 变更监听与事件解绑，否则出现"已关闭但仍在响应选区"的脏状态。
 * 迁移逻辑需要为老用户兜底，避免已可用功能无声退化。
+* Content script 必须用独立 build（IIFE + inlineDynamicImports），CRXJS 的 HMR/loader 不能用；shared 模块在 content bundle 中重复打包（可接受，content 是该 bundle 唯一消费者）。
+* Dev 模式下 content script 无 HMR（独立 build），改动需重新 build + 刷新扩展。
 
 ## Alternatives Considered
 
