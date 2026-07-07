@@ -1,4 +1,5 @@
 import type { ContentState } from "../state";
+import { getShadowRoot } from "./shadow-host";
 
 export function createFloatingButton(state: ContentState, onClick: (e: MouseEvent) => void): void {
   if (state.floatingBtn) return;
@@ -6,7 +7,7 @@ export function createFloatingButton(state: ContentState, onClick: (e: MouseEven
   btn.id = "mp-floating-btn";
   btn.textContent = "生成评论";
   btn.addEventListener("click", onClick);
-  document.body.appendChild(btn);
+  getShadowRoot().appendChild(btn);
   state.floatingBtn = btn;
 }
 

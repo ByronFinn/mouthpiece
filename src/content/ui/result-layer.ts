@@ -1,5 +1,6 @@
 import type { ApiResult, MultiPresetResult } from "../../shared/types";
 import type { ContentState } from "../state";
+import { getShadowRoot } from "./shadow-host";
 
 export function showResultLayer(
   state: ContentState,
@@ -73,8 +74,9 @@ export function showResultLayer(
 
   positionResultLayer(state);
 
-  document.body.appendChild(overlay);
-  document.body.appendChild(resultLayer);
+  const root = getShadowRoot();
+  root.appendChild(overlay);
+  root.appendChild(resultLayer);
 
   overlay.classList.add("visible");
   resultLayer.classList.add("visible");

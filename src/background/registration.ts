@@ -27,7 +27,6 @@ export async function syncContentScriptRegistration(): Promise<void> {
       {
         id: SCRIPT_ID,
         js,
-        css: ["src/content/content.css"],
         matches: ["<all_urls>"],
         runAt: "document_idle",
         allFrames: false,

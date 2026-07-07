@@ -14,6 +14,7 @@ import {
   closeResultLayer,
   positionResultLayer,
 } from "./ui/result-layer";
+import { destroyShadowHost } from "./ui/shadow-host";
 import { generateComments } from "./generate";
 
 const state = new ContentState();
@@ -60,6 +61,7 @@ function deactivate(): void {
   hideFloatingButton(state);
   closeResultLayer(state);
   destroyFloatingButton(state);
+  destroyShadowHost();
 }
 
 /** Reposition visible UI on scroll/resize using the stored selection anchor. */
