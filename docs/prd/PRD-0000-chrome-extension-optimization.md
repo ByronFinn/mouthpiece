@@ -1,6 +1,6 @@
 # Chrome 插件架构优化
 
-> **Status**: Sliced | **PRD**: PRD-0000 | **Created**: 2026-07-07 | **Last updated**: 2026-07-07
+> **Status**: Done | **PRD**: PRD-0000 | **Created**: 2026-07-07 | **Last updated**: 2026-07-07
 
 ## Goal
 
@@ -52,11 +52,12 @@
 - **Sliced by**: `/story` → Child Issues below
 - **Arch reviewed by**: `/improve-architecture` (2026-07-07) — Phase 3 架构拆分已转入 PRD-0001
 - **Sliced into**:
-  - #5 — [PRD-0000] 类型化消息与工程基线 (AFK) — In Progress（待合入 F-02/F-04）
-  - #6 — [PRD-0000] 动态 Content Script 注册 (AFK, blocked by #5)
-  - #7 — [PRD-0000] Service Worker 可靠性 (AFK, blocked by #6)
-  - #8 — [PRD-0000] Content UX 打磨 (AFK, blocked by #8)
-  - #9 — [PRD-0000] Shadow DOM UI 隔离 (AFK, blocked by #6)
+  - #5 — [PRD-0000] 类型化消息与工程基线 (AFK) — Done
+  - #6 — [PRD-0000] 动态 Content Script 注册 (AFK, blocked by #5) — Done
+  - #7 — [PRD-0000] Service Worker 可靠性 (AFK, blocked by #6) — Done
+  - #8 — [PRD-0000] Content UX 打磨 (AFK, blocked by #8) — Done
+  - #9 — [PRD-0000] Shadow DOM UI 隔离 (AFK, blocked by #6) — Done
+- **Implemented by**: `/implement` (2026-07-07) — #5-#9 全部完成
 
 ## Issue
 

@@ -1,6 +1,6 @@
 # 架构债清理
 
-> **Status**: In Progress | **PRD**: PRD-0001 | **Created**: 2026-07-07 | **Last updated**: 2026-07-07
+> **Status**: Done | **PRD**: PRD-0001 | **Created**: 2026-07-07 | **Last updated**: 2026-07-07
 
 ## Goal
 
@@ -67,7 +67,7 @@
   - #13 — [PRD-0001] generateId 模块归属 (AFK) — Done
   - #14 — [PRD-0001] 通用下拉组件复用 (AFK, blocked by #11) — Done
   - #15 — [PRD-0001] 错误消息集中 (AFK, blocked by #14) — Done
-  - #16 — [PRD-0001] settings/popup 状态封装 (AFK, blocked by #8) — 待 #8 完成后启动
+  - #16 — [PRD-0001] settings/popup 状态封装 (AFK, blocked by #8) — Done
 - **New terms**: Content Framing（替代 Safety Prefix）
 
 ## Issue
