@@ -16,6 +16,13 @@ const CONTENT_JS = "content.js";
  * on real pages automatically. The Service Worker registers `content.js`
  * dynamically here, so injection happens only when the user has enabled the
  * extension AND configured an API key.
+ *
+ * When the extension transitions to enabled (or the SW starts up with enabled
+ * already on), already-open tabs would otherwise remain without the content
+ * script — `registerContentScripts` only affects future navigations. We
+ * proactively inject `content.js` into every matching existing tab via
+ * `chrome.scripting.executeScript`. The content script is idempotent (its
+ * `activateIfAllowed()` no-ops if already active), so re-injection is safe.
  */
 export async function syncContentScriptRegistration(): Promise<void> {
   const settings = await loadSettings();
@@ -34,8 +41,43 @@ export async function syncContentScriptRegistration(): Promise<void> {
         allFrames: false,
       },
     ]);
+    // Cover already-open tabs that won't get the newly-registered script.
+    await injectIntoExistingTabs();
   } else if (!shouldRun && isRegistered) {
     await chrome.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] });
   }
 }
+
+/**
+ * Injects the content script into all currently-open http(s) tabs. Called when
+ * registration is first created (enabled toggle or SW startup while enabled).
+ * Failures on individual tabs (e.g. chrome:// pages, no permission) are
+ * ignored — the tab simply won't get the script until its next navigation.
+ */
+async function injectIntoExistingTabs(): Promise<void> {
+  try {
+    const tabs = await chrome.tabs.query({});
+    const targets = tabs
+      .filter((t) => typeof t.id === "number" && /^https?:/.test(t.url || ""))
+      .map((t) => ({ tabId: t.id as number }));
+
+    if (targets.length === 0) return;
+
+    // Fan out per-tab to tolerate individual failures (chrome://, web store,
+    // dev tools, etc.). The content script's activateIfAllowed() is idempotent,
+    // so re-injection on already-active tabs is a safe no-op.
+    await Promise.all(
+      targets.map((target) =>
+        chrome.scripting
+          .executeScript({ target, files: [CONTENT_JS] })
+          .catch(() => {
+            /* tab not injectable — skip */
+          }),
+      ),
+    );
+  } catch (err: unknown) {
+    console.error("[mouthpiece] inject into existing tabs failed:", err);
+  }
+}
+
 

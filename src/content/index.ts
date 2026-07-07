@@ -17,107 +17,128 @@ import {
 import { destroyShadowHost } from "./ui/shadow-host";
 import { generateComments } from "./generate";
 
-const state = new ContentState();
-let active = false;
+// Dedup guard: the SW may inject this script multiple times into the same tab
+// (e.g. SW restart + executeScript on existing tabs). Within a tab's isolated
+// world, `window` is shared across injections, so this flag prevents double-
+// binding event listeners and creating duplicate UI.
+const MOUTHPIECE_INJECTED = "__mouthpieceInjected__";
+declare global {
+  interface Window {
+    [MOUTHPIECE_INJECTED]?: boolean;
+  }
+}
 
-(async () => {
-  state.settings = await loadSettings();
-  activateIfAllowed();
-})();
+if (window[MOUTHPIECE_INJECTED]) {
+  // Already running in this tab — skip re-initialization.
+  console.debug("[mouthpiece] content script already injected, skipping");
+} else {
+  window[MOUTHPIECE_INJECTED] = true;
+  bootstrap();
+}
 
-chrome.storage.onChanged.addListener((_changes, area) => {
-  if (area !== "local") return;
-  loadSettings().then((newSettings) => {
-    const wasActive = active;
-    state.settings = newSettings;
-    state.currentPresetId = newSettings.selectedPresetIds[0] || "critic";
+function bootstrap(): void {
+  const state = new ContentState();
+  let active = false;
 
-    if (newSettings.enabled && newSettings.apiKey) {
-      activateIfAllowed();
-    } else if (wasActive) {
-      // Disabled or key cleared — tear down everything and stop responding.
-      deactivate();
-    }
+  (async () => {
+    state.settings = await loadSettings();
+    activateIfAllowed();
+  })();
+
+  chrome.storage.onChanged.addListener((_changes, area) => {
+    if (area !== "local") return;
+    loadSettings().then((newSettings) => {
+      const wasActive = active;
+      state.settings = newSettings;
+      state.currentPresetId = newSettings.selectedPresetIds[0] || "critic";
+
+      if (newSettings.enabled && newSettings.apiKey) {
+        activateIfAllowed();
+      } else if (wasActive) {
+        // Disabled or key cleared — tear down everything and stop responding.
+        deactivate();
+      }
+    });
   });
-});
 
-/** Bind UI only when enabled && apiKey; idempotent. */
-function activateIfAllowed(): void {
-  if (active) return;
-  if (!state.settings || !state.settings.enabled || !state.settings.apiKey) return;
-  active = true;
-  createFloatingButton(state, onFloatingBtnClick);
-  document.addEventListener("mouseup", onMouseUp, { capture: true });
-  window.addEventListener("scroll", onViewportChange, { passive: true });
-  window.addEventListener("resize", onViewportChange);
-}
-
-/** Remove all UI and unbind events; idempotent. */
-function deactivate(): void {
-  active = false;
-  document.removeEventListener("mouseup", onMouseUp, { capture: true });
-  window.removeEventListener("scroll", onViewportChange);
-  window.removeEventListener("resize", onViewportChange);
-  hideFloatingButton(state);
-  closeResultLayer(state);
-  destroyFloatingButton(state);
-  destroyShadowHost();
-}
-
-/** Reposition visible UI on scroll/resize using the stored selection anchor. */
-function onViewportChange(): void {
-  if (state.floatingBtn && state.floatingBtn.style.display !== "none") {
-    positionFloatingButton(state);
-  }
-  if (state.resultLayer) {
-    positionResultLayer(state);
-  }
-}
-
-function onMouseUp(e: MouseEvent) {
-  if (
-    e.target instanceof HTMLElement &&
-    (e.target.closest("#mp-floating-btn") ||
-      e.target.closest("#mp-result-layer") ||
-      e.target.closest("#mp-overlay"))
-  ) {
-    return;
+  /** Bind UI only when enabled && apiKey; idempotent. */
+  function activateIfAllowed(): void {
+    if (active) return;
+    if (!state.settings || !state.settings.enabled || !state.settings.apiKey) return;
+    active = true;
+    createFloatingButton(state, onFloatingBtnClick);
+    document.addEventListener("mouseup", onMouseUp, { capture: true });
+    window.addEventListener("scroll", onViewportChange, { passive: true });
+    window.addEventListener("resize", onViewportChange);
   }
 
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed) {
+  /** Remove all UI and unbind events; idempotent. */
+  function deactivate(): void {
+    active = false;
+    document.removeEventListener("mouseup", onMouseUp, { capture: true });
+    window.removeEventListener("scroll", onViewportChange);
+    window.removeEventListener("resize", onViewportChange);
     hideFloatingButton(state);
-    return;
+    closeResultLayer(state);
+    destroyFloatingButton(state);
+    destroyShadowHost();
   }
 
-  const range = selection.getRangeAt(0);
-  const rect = range.getBoundingClientRect();
-  const clonedRange = range.cloneRange();
-
-  let text = extractTextWithEmoji(clonedRange).trim();
-  if (!text) {
-    text = selection.toString().trim();
+  /** Reposition visible UI on scroll/resize using the stored selection anchor. */
+  function onViewportChange(): void {
+    if (state.floatingBtn && state.floatingBtn.style.display !== "none") {
+      positionFloatingButton(state);
+    }
+    if (state.resultLayer) {
+      positionResultLayer(state);
+    }
   }
-  if (text.length < 2) {
+
+  function onMouseUp(e: MouseEvent) {
+    if (
+      e.target instanceof HTMLElement &&
+      (e.target.closest("#mp-floating-btn") ||
+        e.target.closest("#mp-result-layer") ||
+        e.target.closest("#mp-overlay"))
+    ) {
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      hideFloatingButton(state);
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const clonedRange = range.cloneRange();
+
+    let text = extractTextWithEmoji(clonedRange).trim();
+    if (!text) {
+      text = selection.toString().trim();
+    }
+    if (text.length < 2) {
+      hideFloatingButton(state);
+      return;
+    }
+
+    state.currentText = text;
+    state.currentImages = extractImages(clonedRange);
+    state.currentRect = rect;
+
+    showFloatingButton(state, rect);
+  }
+
+  async function onFloatingBtnClick(e: MouseEvent) {
+    e.stopPropagation();
     hideFloatingButton(state);
-    return;
+    showResultLayer(
+      state,
+      () => closeResultLayer(state),
+      () => generateComments(state),
+      () => generateComments(state)
+    );
+    await generateComments(state);
   }
-
-  state.currentText = text;
-  state.currentImages = extractImages(clonedRange);
-  state.currentRect = rect;
-
-  showFloatingButton(state, rect);
-}
-
-async function onFloatingBtnClick(e: MouseEvent) {
-  e.stopPropagation();
-  hideFloatingButton(state);
-  showResultLayer(
-    state,
-    () => closeResultLayer(state),
-    () => generateComments(state),
-    () => generateComments(state)
-  );
-  await generateComments(state);
 }
