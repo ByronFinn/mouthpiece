@@ -1,5 +1,5 @@
 import type { Settings, ApiResult, GenerateResponse, Comment } from "./types";
-import { buildSystemPrompt } from "./presets";
+import { buildSystemPrompt, buildUserMessageText } from "./presets";
 
 export function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
@@ -93,8 +93,10 @@ export async function callOpenAI(
     settings.repliesPerStyle
   );
 
+  const userText = buildUserMessageText(text, images.length);
+
   const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
-    { type: "text", text },
+    { type: "text", text: userText },
   ];
 
   for (const imgUrl of images) {
