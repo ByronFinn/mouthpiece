@@ -45,7 +45,10 @@ export interface FilterableDropdownOptions {
 /** Handle returned by createFilterableDropdown so callers can update options dynamically. */
 export interface FilterableDropdownHandle {
   wrapper: HTMLDivElement;
-  /** Replace the dropdown's option list and re-render the open panel if applicable. */
+  /**
+   * Replace the dropdown's option list. Does NOT re-render the open panel —
+   * callers must invoke refresh() afterward to update the visible options.
+   */
   setOptions: (options: string[]) => void;
   /** Re-render the dropdown panel against the current input value (e.g. after setOptions). */
   refresh: () => void;

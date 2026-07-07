@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   normalizeBaseUrl,
-  mapHttpError,
   parseResponse,
   sanitizeOutput,
   sanitizeApiResult,
@@ -45,14 +44,6 @@ describe("normalizeBaseUrl", () => {
   it("strips trailing slashes", () => {
     expect(normalizeBaseUrl("https://api.openai.com/v1/")).toBe("https://api.openai.com/v1");
     expect(normalizeBaseUrl("https://api.openai.com/v1///")).toBe("https://api.openai.com/v1");
-  });
-});
-
-describe("mapHttpError", () => {
-  it("maps known status codes", () => {
-    expect(mapHttpError(401)).toContain("API Key");
-    expect(mapHttpError(429)).toContain("频繁");
-    expect(mapHttpError(404)).toContain("不存在");
   });
 });
 
@@ -243,5 +234,16 @@ describe("callOpenAI", () => {
 
     expect(result.ok).toBe(true);
     expect(result.data?.comments).toHaveLength(2);
+  });
+
+  it("returns a centralized REQUEST_FAILED_PREFIX message when fetch rejects", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockRejectedValueOnce(new Error("network down"));
+
+    const result = await callOpenAI(baseSettings, "hello", [], "critic");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("请求失败：");
+    expect(result.error).toContain("network down");
   });
 });

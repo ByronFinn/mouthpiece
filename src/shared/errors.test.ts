@@ -10,13 +10,24 @@ import {
 describe("mapHttpError", () => {
   it("maps known status codes", () => {
     expect(mapHttpError(401)).toContain("API Key");
+    expect(mapHttpError(402)).toContain("余额");
+    expect(mapHttpError(403)).toContain("权限");
     expect(mapHttpError(404)).toContain("不存在");
     expect(mapHttpError(429)).toContain("频繁");
   });
 
   it("maps 5xx to server error", () => {
     expect(mapHttpError(500)).toContain("服务");
+    expect(mapHttpError(502)).toContain("服务");
     expect(mapHttpError(503)).toContain("服务");
+  });
+
+  it("falls back to HTTP status template for unknown 4xx", () => {
+    expect(mapHttpError(418)).toContain("HTTP 418");
+  });
+
+  it("falls back to generic server error for unknown 5xx", () => {
+    expect(mapHttpError(599)).toContain("服务器错误");
   });
 });
 
@@ -32,6 +43,11 @@ describe("errorFromResponse", () => {
 
   it("falls back to UNKNOWN_ERROR when error is empty", () => {
     const msg = errorFromResponse({ ok: false, status: 0, error: "" });
+    expect(msg).toBe(`${GENERATION_FAILED_PREFIX}${UNKNOWN_ERROR}`);
+  });
+
+  it("falls back to UNKNOWN_ERROR when error is omitted", () => {
+    const msg = errorFromResponse({ ok: false, status: 0 });
     expect(msg).toBe(`${GENERATION_FAILED_PREFIX}${UNKNOWN_ERROR}`);
   });
 });

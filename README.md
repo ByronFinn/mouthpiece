@@ -45,7 +45,7 @@ You can also create custom presets via the Settings page.
 - **Text + Image support** — select text with images, they're extracted via canvas
 - **Multiple presets** — built-in Cynic + Wholesome, add your own custom presets
 - **Single / Multi style** — generate multiple replies from one preset, or one reply per preset
-- **Safety prefix** — prevents prompt injection from selected text
+- **Content framing** — system rules + user-message wrapping prevent prompt injection from selected text
 - **Output sanitization** — detects prompt leakage in AI responses
 - **Smart image fallback** — if the model doesn't support vision, silently retries without images
 - **Robust JSON parsing** — direct parse → code block extraction → bracket matching

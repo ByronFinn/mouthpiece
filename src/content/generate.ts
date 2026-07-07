@@ -6,7 +6,7 @@ import {
   renderMultiComments,
   renderError,
 } from "./ui/result-layer";
-import { GENERATION_FAILED_PREFIX, REQUEST_FAILED_PREFIX } from "../shared/errors";
+import { GENERATION_FAILED_PREFIX, REQUEST_FAILED_PREFIX, UNKNOWN_ERROR } from "../shared/errors";
 
 export async function generateComments(state: ContentState): Promise<void> {
   if (state.isLoading || !state.resultLayer) return;
@@ -34,7 +34,7 @@ export async function generateComments(state: ContentState): Promise<void> {
     });
 
     if (!response.ok) {
-      renderError(body, response.error || GENERATION_FAILED_PREFIX, () => generateComments(state));
+      renderError(body, response.error || `${GENERATION_FAILED_PREFIX}${UNKNOWN_ERROR}`, () => generateComments(state));
     } else if (isMulti && response.multiData) {
       renderMultiComments(body, response.multiData);
     } else if (!isMulti && response.data?.comments?.length) {
