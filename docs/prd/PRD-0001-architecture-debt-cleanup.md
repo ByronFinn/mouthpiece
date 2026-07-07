@@ -1,6 +1,6 @@
 # 架构债清理
 
-> **Status**: Sliced | **PRD**: PRD-0001 | **Created**: 2026-07-07 | **Last updated**: 2026-07-07
+> **Status**: In Progress | **PRD**: PRD-0001 | **Created**: 2026-07-07 | **Last updated**: 2026-07-07
 
 ## Goal
 

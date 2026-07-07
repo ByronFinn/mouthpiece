@@ -31,15 +31,17 @@ export async function saveSettings(settings: Partial<Settings>): Promise<void> {
 export function mergePresets(stored?: Preset[]): Preset[] {
   if (!stored || !Array.isArray(stored)) return [...DEFAULT_SETTINGS.presets];
 
+  // Work on a copy — never mutate the caller's array.
+  const result = [...stored];
+
   // Ensure built-in presets exist
-  const builtInIds = new Set(BUILT_IN_PRESETS.map(p => p.id));
-  const storedMap = new Map(stored.map(p => [p.id, p]));
+  const storedMap = new Map(result.map(p => [p.id, p]));
 
   for (const builtIn of BUILT_IN_PRESETS) {
     if (!storedMap.has(builtIn.id)) {
-      stored.push(builtIn);
+      result.push(builtIn);
     }
   }
 
-  return stored;
+  return result;
 }
