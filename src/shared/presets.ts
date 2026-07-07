@@ -188,10 +188,6 @@ export const BUILT_IN_PRESETS: Preset[] = [
   },
 ];
 
-export function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
 export const DEFAULT_SETTINGS: Omit<Settings, "apiKey"> = {
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-4o",

@@ -1,5 +1,6 @@
 import { saveSettings } from "../../shared/storage";
-import { BUILT_IN_PRESETS, generateId } from "../../shared/presets";
+import { BUILT_IN_PRESETS } from "../../shared/presets";
+import { generateId } from "../../shared/id";
 import type { Settings, Preset } from "../../shared/types";
 import { showSourcePicker } from "../modals";
 import { showToast } from "./helpers";
