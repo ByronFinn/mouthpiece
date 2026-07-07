@@ -1,27 +1,34 @@
 import { loadSettings } from "../shared/storage";
-import type { Settings } from "../shared/types";
+import { SettingsState } from "./state";
 import { renderApiSection } from "./ui/api-section";
 import { renderGenerationSection } from "./ui/generation-section";
 import { renderPresetsSection } from "./ui/presets-section";
 
-let settings: Settings;
-let editingPresetId: string | null = null;
+const state = new SettingsState();
 
 (async () => {
-  settings = await loadSettings();
+  const settings = await loadSettings();
+  state.setSettings(settings);
   render();
 })();
 
 function render() {
+  if (!state.settings) return;
   const container = document.getElementById("settings-content")!;
   container.innerHTML = "";
+
+  // Bind a non-null snapshot for the render closures below.
+  const settings = state.settings;
 
   container.appendChild(renderApiSection(settings));
   container.appendChild(renderGenerationSection(settings));
   container.appendChild(renderPresetsSection({
     settings,
-    getEditingPresetId: () => editingPresetId,
-    setEditingPresetId: (id) => { editingPresetId = id; },
+    getEditingPresetId: () => state.editingPresetId,
+    setEditingPresetId: (id) => {
+      if (id === null) state.stopEditing();
+      else state.startEditing(id);
+    },
     rerender: render,
   }));
 }
