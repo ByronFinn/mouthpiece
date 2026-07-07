@@ -40,7 +40,7 @@ export function renderGenerationSection(settings: Settings): HTMLDivElement {
   })));
 
   let langSaveTimeout: ReturnType<typeof setTimeout>;
-  const langWrapper = createFilterableDropdown({
+  const langDropdown = createFilterableDropdown({
     value: settings.translationLang,
     placeholder: "中文",
     options: LANGUAGES,
@@ -61,7 +61,7 @@ export function renderGenerationSection(settings: Settings): HTMLDivElement {
       filtered.length === 0 || (filtered.length === 1 && filtered[0] === filter),
   });
 
-  genSection.appendChild(createFormGroup("我的语言", langWrapper));
+  genSection.appendChild(createFormGroup("我的语言", langDropdown.wrapper));
 
   const langNote = document.createElement("div");
   langNote.className = "note";
