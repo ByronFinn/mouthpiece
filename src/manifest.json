@@ -3,7 +3,7 @@
   "name": "Mouthpiece / 嘴替",
   "version": "0.0.1",
   "description": "Generate multi-style comments for selected text — BYOK OpenAI-compatible",
-  "permissions": ["activeTab", "storage", "scripting"],
+  "permissions": ["activeTab", "storage", "scripting", "alarms"],
   "host_permissions": ["<all_urls>"],
   "icons": {
     "16": "icons/icon16.png",

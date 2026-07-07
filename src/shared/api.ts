@@ -57,7 +57,8 @@ function buildChatBody(
 
 async function postChatCompletion(
   settings: Settings,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  signal?: AbortSignal
 ): Promise<{ ok: true; raw: string } | { ok: false; status: number }> {
   const url = `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`;
   const res = await fetch(url, {
@@ -67,6 +68,7 @@ async function postChatCompletion(
       ...authHeaders(settings.apiKey),
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) {
@@ -84,14 +86,16 @@ async function generateWithJsonMode(
   userText: string,
   images: string[],
   expectedCount: number,
-  useJsonObject: boolean
+  useJsonObject: boolean,
+  signal?: AbortSignal
 ): Promise<GenerateResponse | "unsupported_json_object"> {
   let text = userText;
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await postChatCompletion(
       settings,
-      buildChatBody(settings, systemPrompt, buildContentParts(text, images), useJsonObject)
+      buildChatBody(settings, systemPrompt, buildContentParts(text, images), useJsonObject),
+      signal
     );
 
     if (!result.ok) {
@@ -171,7 +175,8 @@ export async function callOpenAI(
   settings: Settings,
   text: string,
   images: string[],
-  presetId: string
+  presetId: string,
+  signal?: AbortSignal
 ): Promise<GenerateResponse> {
   const preset = settings.presets.find(p => p.id === presetId);
   if (!preset) {
@@ -194,7 +199,8 @@ export async function callOpenAI(
       userText,
       images,
       expectedCount,
-      true
+      true,
+      signal
     );
 
     if (jsonModeResult !== "unsupported_json_object") {
@@ -207,13 +213,18 @@ export async function callOpenAI(
       userText,
       images,
       expectedCount,
-      false
+      false,
+      signal
     );
     if (fallbackResult === "unsupported_json_object") {
       return { ok: false, status: 0, error: "无法解析 AI 回复" };
     }
     return fallbackResult;
   } catch (err: unknown) {
+    // Aborted requests are expected (user clicked "换一批" or disabled the extension).
+    if (err instanceof DOMException && err.name === "AbortError") {
+      return { ok: false, status: 0, error: "已取消" };
+    }
     if (err instanceof TypeError && err.message.includes("fetch")) {
       return { ok: false, status: 0, error: "网络连接失败，请检查网络或 Base URL" };
     }
@@ -226,11 +237,12 @@ export async function callWithImageFallback(
   settings: Settings,
   text: string,
   images: string[],
-  presetId: string
+  presetId: string,
+  signal?: AbortSignal
 ): Promise<GenerateResponse> {
-  let response = await callOpenAI(settings, text, images, presetId);
+  let response = await callOpenAI(settings, text, images, presetId, signal);
   if (!response.ok && images.length > 0) {
-    response = await callOpenAI(settings, text, [], presetId);
+    response = await callOpenAI(settings, text, [], presetId, signal);
   }
   if (response.ok && "data" in response) {
     response = { ...response, data: sanitizeApiResult(response.data) };

@@ -62,9 +62,7 @@ describe("loadSettings enabled migration", () => {
   });
 
   function mockStored(value: unknown): void {
-    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce(
-      value as Record<string, unknown>,
-    );
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce(value as never);
   }
 
   it("defaults enabled to false for fresh install (no stored data)", async () => {
