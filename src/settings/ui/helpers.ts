@@ -42,7 +42,19 @@ export interface FilterableDropdownOptions {
   shouldHideWhen?: (filter: string, filtered: string[]) => boolean;
 }
 
-export function createFilterableDropdown(opts: FilterableDropdownOptions): HTMLDivElement {
+/** Handle returned by createFilterableDropdown so callers can update options dynamically. */
+export interface FilterableDropdownHandle {
+  wrapper: HTMLDivElement;
+  /**
+   * Replace the dropdown's option list. Does NOT re-render the open panel —
+   * callers must invoke refresh() afterward to update the visible options.
+   */
+  setOptions: (options: string[]) => void;
+  /** Re-render the dropdown panel against the current input value (e.g. after setOptions). */
+  refresh: () => void;
+}
+
+export function createFilterableDropdown(opts: FilterableDropdownOptions): FilterableDropdownHandle {
   const wrapper = document.createElement("div");
   wrapper.className = "model-dropdown";
 
@@ -54,10 +66,13 @@ export function createFilterableDropdown(opts: FilterableDropdownOptions): HTMLD
   const dropdownList = document.createElement("div");
   dropdownList.className = "model-dropdown-list";
 
+  // Mutable copy so setOptions can update without rebuilding the wrapper.
+  let currentOptions = opts.options;
+
   function renderDropdown(filter: string) {
     dropdownList.innerHTML = "";
     const q = filter.toLowerCase();
-    const filtered = opts.options.filter((o) => o.toLowerCase().includes(q));
+    const filtered = currentOptions.filter((o) => o.toLowerCase().includes(q));
     if (opts.shouldHideWhen?.(filter, filtered) || filtered.length === 0) {
       dropdownList.classList.remove("open");
       return;
@@ -88,6 +103,12 @@ export function createFilterableDropdown(opts: FilterableDropdownOptions): HTMLD
   wrapper.appendChild(input);
   wrapper.appendChild(dropdownList);
 
-  return wrapper;
+  return {
+    wrapper,
+    setOptions: (options: string[]) => {
+      currentOptions = options;
+    },
+    refresh: () => renderDropdown(input.value),
+  };
 }
 

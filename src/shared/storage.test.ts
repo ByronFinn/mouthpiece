@@ -26,4 +26,19 @@ describe("mergePresets", () => {
     const presets = mergePresets([custom]);
     expect(presets.some((p) => p.id === "custom-1")).toBe(true);
   });
+
+  it("does not mutate the input array", () => {
+    const input = [
+      { id: "custom-1", name: "自定义", systemPrompt: "test", builtIn: false },
+    ];
+    const snapshot = [...input];
+
+    const result = mergePresets(input);
+
+    // Input array reference is unchanged
+    expect(input).toEqual(snapshot);
+    // Result is a new array (built-ins were appended to the copy, not the input)
+    expect(result).not.toBe(input);
+    expect(result.length).toBeGreaterThan(input.length);
+  });
 });
