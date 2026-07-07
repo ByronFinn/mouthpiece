@@ -23,6 +23,107 @@ function authHeaders(apiKey: string): Record<string, string> {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
+export function isUnsupportedJsonObjectError(status: number): boolean {
+  return status === 400 || status === 422;
+}
+
+function formatRetrySuffix(expectedCount: number): string {
+  return (
+    `\n\n[Format correction: return ONLY valid JSON. ` +
+    `The "comments" array MUST contain exactly ${expectedCount} objects, ` +
+    `each with "content" and "translation" fields.]`
+  );
+}
+
+type ContentPart = { type: string; text?: string; image_url?: { url: string } };
+
+function buildContentParts(userText: string, images: string[]): ContentPart[] {
+  const parts: ContentPart[] = [{ type: "text", text: userText }];
+  for (const imgUrl of images) {
+    parts.push({ type: "image_url", image_url: { url: imgUrl } });
+  }
+  return parts;
+}
+
+function buildChatBody(
+  settings: Settings,
+  systemPrompt: string,
+  contentParts: ContentPart[],
+  useJsonObject: boolean
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: settings.model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: contentParts },
+    ],
+    stream: false,
+  };
+  if (useJsonObject) {
+    body.response_format = { type: "json_object" };
+  }
+  return body;
+}
+
+async function postChatCompletion(
+  settings: Settings,
+  body: Record<string, unknown>
+): Promise<{ ok: true; raw: string } | { ok: false; status: number }> {
+  const url = `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(settings.apiKey),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    return { ok: false, status: res.status };
+  }
+
+  const json = await res.json();
+  const raw = json.choices?.[0]?.message?.content || "";
+  return { ok: true, raw };
+}
+
+async function generateWithJsonMode(
+  settings: Settings,
+  systemPrompt: string,
+  userText: string,
+  images: string[],
+  expectedCount: number,
+  useJsonObject: boolean
+): Promise<GenerateResponse | "unsupported_json_object"> {
+  let text = userText;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await postChatCompletion(
+      settings,
+      buildChatBody(settings, systemPrompt, buildContentParts(text, images), useJsonObject)
+    );
+
+    if (!result.ok) {
+      if (useJsonObject && isUnsupportedJsonObjectError(result.status)) {
+        return "unsupported_json_object";
+      }
+      return { ok: false, status: result.status, error: mapHttpError(result.status) };
+    }
+
+    const parsed = tryParseApiResult(result.raw, expectedCount);
+    if (parsed) {
+      return { ok: true, status: 200, data: parsed };
+    }
+
+    if (attempt === 0) {
+      text = userText + formatRetrySuffix(expectedCount);
+    }
+  }
+
+  return { ok: false, status: 0, error: "无法解析 AI 回复" };
+}
+
 export async function fetchModels(settings: Settings): Promise<{ ok: true; models: string[] } | { ok: false; error: string }> {
   if (!settings.apiKey || !settings.baseUrl) {
     return { ok: false, error: "请先填写 API Key 和 Base URL" };
@@ -94,51 +195,34 @@ export async function callOpenAI(
   );
 
   const userText = buildUserMessageText(text, images.length);
-
-  const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
-    { type: "text", text: userText },
-  ];
-
-  for (const imgUrl of images) {
-    contentParts.push({
-      type: "image_url",
-      image_url: { url: imgUrl },
-    });
-  }
-
-  const body = {
-    model: settings.model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: contentParts },
-    ],
-    stream: false,
-  };
+  const expectedCount = settings.repliesPerStyle;
 
   try {
-    const url = `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders(settings.apiKey),
-      },
-      body: JSON.stringify(body),
-    });
+    const jsonModeResult = await generateWithJsonMode(
+      settings,
+      systemPrompt,
+      userText,
+      images,
+      expectedCount,
+      true
+    );
 
-    if (!res.ok) {
-      return { ok: false, status: res.status, error: mapHttpError(res.status) };
+    if (jsonModeResult !== "unsupported_json_object") {
+      return jsonModeResult;
     }
 
-    const json = await res.json();
-    const raw = json.choices?.[0]?.message?.content || "";
-    const parsed = parseResponse(raw);
-
-    if (!parsed) {
+    const fallbackResult = await generateWithJsonMode(
+      settings,
+      systemPrompt,
+      userText,
+      images,
+      expectedCount,
+      false
+    );
+    if (fallbackResult === "unsupported_json_object") {
       return { ok: false, status: 0, error: "无法解析 AI 回复" };
     }
-
-    return { ok: true, status: 200, data: parsed };
+    return fallbackResult;
   } catch (err: unknown) {
     if (err instanceof TypeError && err.message.includes("fetch")) {
       return { ok: false, status: 0, error: "网络连接失败，请检查网络或 Base URL" };
@@ -172,6 +256,38 @@ export function sanitizeApiResult(data: ApiResult): ApiResult {
       translation: c.translation ? sanitizeOutput(c.translation) : null,
     })),
   };
+}
+
+export function validateApiResult(obj: unknown, expectedCount: number): obj is ApiResult {
+  if (typeof obj !== "object" || obj === null) return false;
+
+  const result = obj as ApiResult;
+  if (!("comments" in result) || !Array.isArray(result.comments)) return false;
+  if (result.comments.length !== expectedCount) return false;
+
+  if (
+    "translation" in result &&
+    result.translation !== null &&
+    typeof result.translation !== "string"
+  ) {
+    return false;
+  }
+
+  for (const comment of result.comments) {
+    if (typeof comment !== "object" || comment === null) return false;
+    if (typeof comment.content !== "string" || !comment.content) return false;
+    if (comment.translation !== null && typeof comment.translation !== "string") {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function tryParseApiResult(raw: string, expectedCount: number): ApiResult | null {
+  const parsed = parseResponse(raw);
+  if (!parsed || !validateApiResult(parsed, expectedCount)) return null;
+  return parsed;
 }
 
 export function parseResponse(raw: string): ApiResult | null {

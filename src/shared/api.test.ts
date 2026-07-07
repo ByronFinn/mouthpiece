@@ -1,11 +1,45 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   normalizeBaseUrl,
   mapHttpError,
   parseResponse,
   sanitizeOutput,
   sanitizeApiResult,
+  validateApiResult,
+  tryParseApiResult,
+  isUnsupportedJsonObjectError,
+  callOpenAI,
 } from "./api";
+import { BUILT_IN_PRESETS } from "./presets";
+import type { Settings } from "./types";
+
+const baseSettings: Settings = {
+  apiKey: "sk-test",
+  baseUrl: "https://api.example.com/v1",
+  model: "test-model",
+  translationLang: "中文",
+  generationMode: "single",
+  repliesPerStyle: 2,
+  presets: [...BUILT_IN_PRESETS],
+  selectedPresetIds: ["critic"],
+};
+
+function makeComment(content: string) {
+  return { content, translation: null as string | null };
+}
+
+function validPayload(count = 2) {
+  return {
+    translation: null,
+    comments: Array.from({ length: count }, (_, i) => makeComment(`comment-${i + 1}`)),
+  };
+}
+
+function chatResponse(payload: unknown) {
+  return {
+    choices: [{ message: { content: JSON.stringify(payload) } }],
+  };
+}
 
 describe("normalizeBaseUrl", () => {
   it("strips trailing slashes", () => {
@@ -19,6 +53,48 @@ describe("mapHttpError", () => {
     expect(mapHttpError(401)).toContain("API Key");
     expect(mapHttpError(429)).toContain("频繁");
     expect(mapHttpError(404)).toContain("不存在");
+  });
+});
+
+describe("isUnsupportedJsonObjectError", () => {
+  it("treats 400 and 422 as unsupported json_object", () => {
+    expect(isUnsupportedJsonObjectError(400)).toBe(true);
+    expect(isUnsupportedJsonObjectError(422)).toBe(true);
+    expect(isUnsupportedJsonObjectError(401)).toBe(false);
+    expect(isUnsupportedJsonObjectError(500)).toBe(false);
+  });
+});
+
+describe("validateApiResult", () => {
+  it("accepts a payload with the expected comment count", () => {
+    expect(validateApiResult(validPayload(2), 2)).toBe(true);
+  });
+
+  it("rejects wrong comment count", () => {
+    expect(validateApiResult(validPayload(1), 2)).toBe(false);
+  });
+
+  it("rejects empty comment content", () => {
+    expect(
+      validateApiResult(
+        { translation: null, comments: [{ content: "", translation: null }] },
+        1
+      )
+    ).toBe(false);
+  });
+});
+
+describe("tryParseApiResult", () => {
+  it("parses and validates direct JSON", () => {
+    const raw = JSON.stringify(validPayload(2));
+    const result = tryParseApiResult(raw, 2);
+    expect(result?.comments).toHaveLength(2);
+    expect(result?.comments[0].content).toBe("comment-1");
+  });
+
+  it("returns null when comment count mismatches", () => {
+    const raw = JSON.stringify(validPayload(1));
+    expect(tryParseApiResult(raw, 2)).toBeNull();
   });
 });
 
@@ -73,5 +149,99 @@ describe("sanitizeApiResult", () => {
     expect(result.translation).toContain("已过滤");
     expect(result.comments[0].content).toBe("正常");
     expect(result.comments[0].translation).toContain("已过滤");
+  });
+});
+
+describe("callOpenAI", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("requests json_object mode by default", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => chatResponse(validPayload(2)),
+    } as Response);
+
+    const result = await callOpenAI(baseSettings, "hello", [], "critic");
+
+    expect(result.ok).toBe(true);
+    expect(result.data?.comments).toHaveLength(2);
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.response_format).toEqual({ type: "json_object" });
+  });
+
+  it("retries once when the first json_object response is invalid", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => chatResponse(validPayload(1)),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => chatResponse(validPayload(2)),
+      } as Response);
+
+    const result = await callOpenAI(baseSettings, "hello", [], "critic");
+
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    const secondBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(firstBody.response_format).toEqual({ type: "json_object" });
+    expect(secondBody.response_format).toEqual({ type: "json_object" });
+    expect(secondBody.messages[1].content[0].text).toContain("Format correction");
+  });
+
+  it("falls back to plain prompt mode when json_object is unsupported", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => chatResponse(validPayload(2)),
+      } as Response);
+
+    const result = await callOpenAI(baseSettings, "hello", [], "critic");
+
+    expect(result.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const fallbackBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(fallbackBody.response_format).toBeUndefined();
+  });
+
+  it("parses markdown-wrapped JSON in fallback mode", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: '```json\n' + JSON.stringify(validPayload(2)) + '\n```',
+            },
+          }],
+        }),
+      } as Response);
+
+    const result = await callOpenAI(baseSettings, "hello", [], "critic");
+
+    expect(result.ok).toBe(true);
+    expect(result.data?.comments).toHaveLength(2);
   });
 });
