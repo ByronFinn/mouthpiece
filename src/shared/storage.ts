@@ -28,7 +28,7 @@ export async function saveSettings(settings: Partial<Settings>): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEY]: merged });
 }
 
-function mergePresets(stored?: Preset[]): Preset[] {
+export function mergePresets(stored?: Preset[]): Preset[] {
   if (!stored || !Array.isArray(stored)) return [...DEFAULT_SETTINGS.presets];
 
   // Ensure built-in presets exist

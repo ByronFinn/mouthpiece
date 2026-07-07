@@ -1,5 +1,80 @@
-import type { Settings, ApiResult, GenerateResponse } from "./types";
+import type { Settings, ApiResult, GenerateResponse, Comment } from "./types";
 import { buildSystemPrompt } from "./presets";
+
+export function normalizeBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/+$/, "");
+}
+
+export function mapHttpError(status: number): string {
+  switch (status) {
+    case 401: return "API Key 无效，请检查设置";
+    case 402: return "账户余额不足";
+    case 403: return "无权限访问";
+    case 404: return "模型或接口不存在，请检查模型名称";
+    case 429: return "API 配额不足或请求过于频繁，请稍后重试";
+    case 500:
+    case 502:
+    case 503: return "AI 服务暂时不可用，请稍后重试";
+    default: return status >= 500 ? "服务器错误，请稍后重试" : `请求失败 (HTTP ${status})`;
+  }
+}
+
+function authHeaders(apiKey: string): Record<string, string> {
+  return { Authorization: `Bearer ${apiKey}` };
+}
+
+export async function fetchModels(settings: Settings): Promise<{ ok: true; models: string[] } | { ok: false; error: string }> {
+  if (!settings.apiKey || !settings.baseUrl) {
+    return { ok: false, error: "请先填写 API Key 和 Base URL" };
+  }
+
+  try {
+    const res = await fetch(`${normalizeBaseUrl(settings.baseUrl)}/models`, {
+      headers: authHeaders(settings.apiKey),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { ok: false, error: `获取失败 (${res.status}): ${mapHttpError(res.status)}${errText ? ` — ${errText.slice(0, 120)}` : ""}` };
+    }
+    const data = await res.json();
+    const models = ((data.data || []) as { id: string }[])
+      .map((m) => m.id)
+      .sort();
+    return { ok: true, models };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `网络错误: ${message}` };
+  }
+}
+
+export async function testConnection(settings: Settings): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!settings.apiKey || !settings.baseUrl || !settings.model) {
+    return { ok: false, error: "请先填写 API Key、Base URL 和模型" };
+  }
+
+  try {
+    const res = await fetch(`${normalizeBaseUrl(settings.baseUrl)}/chat/completions`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(settings.apiKey),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: settings.model,
+        messages: [{ role: "user", content: "hi" }],
+        max_tokens: 1,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { ok: false, error: `连接失败 (${res.status}): ${mapHttpError(res.status)}${errText ? ` — ${errText.slice(0, 120)}` : ""}` };
+    }
+    return { ok: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: `网络错误: ${message}` };
+  }
+}
 
 export async function callOpenAI(
   settings: Settings,
@@ -18,13 +93,9 @@ export async function callOpenAI(
     settings.repliesPerStyle
   );
 
-  // Build user message content
-  const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
-
-  contentParts.push({
-    type: "text",
-    text: text,
-  });
+  const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+    { type: "text", text },
+  ];
 
   for (const imgUrl of images) {
     contentParts.push({
@@ -43,19 +114,18 @@ export async function callOpenAI(
   };
 
   try {
-    const url = `${settings.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+    const url = `${normalizeBaseUrl(settings.baseUrl)}/chat/completions`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${settings.apiKey}`,
+        ...authHeaders(settings.apiKey),
       },
       body: JSON.stringify(body),
     });
 
     if (!res.ok) {
-      const error = mapHttpError(res.status);
-      return { ok: false, status: res.status, error };
+      return { ok: false, status: res.status, error: mapHttpError(res.status) };
     }
 
     const json = await res.json();
@@ -67,35 +137,47 @@ export async function callOpenAI(
     }
 
     return { ok: true, status: 200, data: parsed };
-  } catch (err: any) {
-    if (err.name === "TypeError" && err.message.includes("fetch")) {
+  } catch (err: unknown) {
+    if (err instanceof TypeError && err.message.includes("fetch")) {
       return { ok: false, status: 0, error: "网络连接失败，请检查网络或 Base URL" };
     }
-    return { ok: false, status: 0, error: `请求失败：${err.message}` };
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, status: 0, error: `请求失败：${message}` };
   }
 }
 
-function mapHttpError(status: number): string {
-  switch (status) {
-    case 401: return "API Key 无效，请检查设置";
-    case 402:
-    case 429: return "API 配额不足或请求过于频繁";
-    case 404: return "模型不存在，请检查模型名称";
-    case 500:
-    case 502:
-    case 503: return "AI 服务暂时不可用，请稍后重试";
-    default: return `请求失败 (HTTP ${status})`;
+export async function callWithImageFallback(
+  settings: Settings,
+  text: string,
+  images: string[],
+  presetId: string
+): Promise<GenerateResponse> {
+  let response = await callOpenAI(settings, text, images, presetId);
+  if (!response.ok && images.length > 0) {
+    response = await callOpenAI(settings, text, [], presetId);
   }
+  if (response.ok && response.data) {
+    response.data = sanitizeApiResult(response.data);
+  }
+  return response;
 }
 
-function parseResponse(raw: string): ApiResult | null {
-  // 1. Direct JSON parse
+export function sanitizeApiResult(data: ApiResult): ApiResult {
+  return {
+    translation: data.translation ? sanitizeOutput(data.translation) : null,
+    comments: data.comments.map((c: Comment) => ({
+      content: sanitizeOutput(c.content),
+      translation: c.translation ? sanitizeOutput(c.translation) : null,
+    })),
+  };
+}
+
+export function parseResponse(raw: string): ApiResult | null {
   try {
     const parsed = JSON.parse(raw);
     if (isValidResult(parsed)) return parsed;
   } catch {}
 
-  // 2. Extract from code block
   const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) {
     try {
@@ -104,7 +186,6 @@ function parseResponse(raw: string): ApiResult | null {
     } catch {}
   }
 
-  // 3. Bracket matching — find outermost { }
   const firstBrace = raw.indexOf("{");
   const lastBrace = raw.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace > firstBrace) {
@@ -117,18 +198,17 @@ function parseResponse(raw: string): ApiResult | null {
   return null;
 }
 
-function isValidResult(obj: any): obj is ApiResult {
+function isValidResult(obj: unknown): obj is ApiResult {
   return (
-    obj &&
     typeof obj === "object" &&
+    obj !== null &&
     "comments" in obj &&
-    Array.isArray(obj.comments) &&
-    obj.comments.length > 0
+    Array.isArray((obj as ApiResult).comments) &&
+    (obj as ApiResult).comments.length > 0
   );
 }
 
 export function sanitizeOutput(text: string): string {
-  // Detect prompt leakage in output
   const leakedPatterns = [
     /system prompt/i,
     /ignore (previous|above|all)/i,

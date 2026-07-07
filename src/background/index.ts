@@ -1,15 +1,16 @@
 import { loadSettings } from "../shared/storage";
-import { callOpenAI, sanitizeOutput } from "../shared/api";
-import type { GenerateResponse, Comment, MultiPresetResult } from "../shared/types";
+import { callWithImageFallback } from "../shared/api";
+import type { GenerateResponse, MultiPresetResult, Settings } from "../shared/types";
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "generate") {
     handleMessage(message)
       .then(sendResponse)
-      .catch((err) => {
-        sendResponse({ ok: false, status: 0, error: `内部错误：${err.message}` });
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        sendResponse({ ok: false, status: 0, error: `内部错误：${message}` });
       });
-    return true; // async response
+    return true;
   }
 });
 
@@ -33,49 +34,27 @@ async function handleMessage(message: {
 }
 
 async function handleSingleMode(
-  settings: any,
+  settings: Settings,
   text: string,
   images: string[],
   presetId: string
 ): Promise<GenerateResponse> {
-  let response = await callOpenAI(settings, text, images, presetId);
-
-  // If failed with images, retry without images (model may not support vision)
-  if (!response.ok && images.length > 0) {
-    response = await callOpenAI(settings, text, [], presetId);
-  }
-
-  if (response.ok && response.data) {
-    response.data.comments = response.data.comments.map((c: Comment) => ({
-      content: sanitizeOutput(c.content),
-      translation: c.translation ? sanitizeOutput(c.translation) : null,
-    }));
-    if (response.data.translation) {
-      response.data.translation = sanitizeOutput(response.data.translation);
-    }
-  }
-
-  return response;
+  return callWithImageFallback(settings, text, images, presetId);
 }
 
 async function handleMultiMode(
-  settings: any,
+  settings: Settings,
   text: string,
   images: string[],
   presetIds: string[]
 ): Promise<GenerateResponse> {
   const results = await Promise.all(
     presetIds.map(async (presetId) => {
-      const preset = settings.presets.find((p: any) => p.id === presetId);
+      const preset = settings.presets.find((p) => p.id === presetId);
       const presetName = preset ? preset.name : presetId;
 
       try {
-        let response = await callOpenAI(settings, text, images, presetId);
-
-        // If failed with images, retry without images
-        if (!response.ok && images.length > 0) {
-          response = await callOpenAI(settings, text, [], presetId);
-        }
+        const response = await callWithImageFallback(settings, text, images, presetId);
 
         if (!response.ok) {
           return {
@@ -88,28 +67,19 @@ async function handleMultiMode(
           } as MultiPresetResult;
         }
 
-        if (response.data) {
-          response.data.comments = response.data.comments.map((c: Comment) => ({
-            content: sanitizeOutput(c.content),
-            translation: c.translation ? sanitizeOutput(c.translation) : null,
-          }));
-          if (response.data.translation) {
-            response.data.translation = sanitizeOutput(response.data.translation);
-          }
-        }
-
         return {
           presetId,
           presetName,
           result: response.data || { translation: null, comments: [] },
         } as MultiPresetResult;
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
         return {
           presetId,
           presetName,
           result: {
             translation: null,
-            comments: [{ content: `生成失败：${err.message}`, translation: null }],
+            comments: [{ content: `生成失败：${message}`, translation: null }],
           },
         } as MultiPresetResult;
       }

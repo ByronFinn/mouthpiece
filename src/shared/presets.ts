@@ -105,7 +105,7 @@ export function generateId(): string {
 export const DEFAULT_SETTINGS: Omit<Settings, "apiKey"> = {
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-4o",
-  translationLang: "Chinese",
+  translationLang: "中文",
   generationMode: "single",
   repliesPerStyle: 3,
   presets: [...BUILT_IN_PRESETS],
