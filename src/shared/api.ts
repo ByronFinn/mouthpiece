@@ -1,11 +1,6 @@
 import type { Settings, ApiResult, GenerateResponse, Comment } from "./types";
 import { buildSystemPrompt, buildUserMessageText } from "./presets";
-import {
-  mapHttpError,
-  GENERATION_FAILED_PREFIX,
-  REQUEST_FAILED_PREFIX,
-  UNKNOWN_ERROR,
-} from "./errors";
+import { mapHttpError, REQUEST_FAILED_PREFIX } from "./errors";
 
 // Re-exported for backwards compatibility — existing callers (and tests) import mapHttpError from "./api".
 export { mapHttpError };
@@ -237,8 +232,8 @@ export async function callWithImageFallback(
   if (!response.ok && images.length > 0) {
     response = await callOpenAI(settings, text, [], presetId);
   }
-  if (response.ok && response.data) {
-    response.data = sanitizeApiResult(response.data);
+  if (response.ok && "data" in response) {
+    response = { ...response, data: sanitizeApiResult(response.data) };
   }
   return response;
 }
@@ -289,14 +284,18 @@ export function parseResponse(raw: string): ApiResult | null {
   try {
     const parsed = JSON.parse(raw);
     if (isValidResult(parsed)) return parsed;
-  } catch {}
+  } catch {
+    // Not pure JSON — try code-block extraction next.
+  }
 
   const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) {
     try {
       const parsed = JSON.parse(codeBlockMatch[1]);
       if (isValidResult(parsed)) return parsed;
-    } catch {}
+    } catch {
+      // Code block wasn't valid JSON — fall through to brace extraction.
+    }
   }
 
   const firstBrace = raw.indexOf("{");
@@ -305,7 +304,9 @@ export function parseResponse(raw: string): ApiResult | null {
     try {
       const parsed = JSON.parse(raw.substring(firstBrace, lastBrace + 1));
       if (isValidResult(parsed)) return parsed;
-    } catch {}
+    } catch {
+      // All parse strategies exhausted — caller will handle null.
+    }
   }
 
   return null;

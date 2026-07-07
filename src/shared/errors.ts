@@ -22,11 +22,13 @@ export function mapHttpError(status: number): string {
   }
 }
 
+/** Type alias for the failure variant of GenerateResponse (where `error` is required). */
+type FailedResponse = Extract<GenerateResponse, { ok: false }>;
+
 /**
  * Extracts the user-facing error message from a failed GenerateResponse.
- * Returns the prefix + UNKNOWN_ERROR if the response carries no error detail.
+ * Falls back to UNKNOWN_ERROR when the response carries an empty error string.
  */
-export function errorFromResponse(response: GenerateResponse): string {
-  if (response.ok) return "";
+export function errorFromResponse(response: FailedResponse): string {
   return `${GENERATION_FAILED_PREFIX}${response.error || UNKNOWN_ERROR}`;
 }

@@ -7,6 +7,7 @@ import {
   renderError,
 } from "./ui/result-layer";
 import { GENERATION_FAILED_PREFIX, REQUEST_FAILED_PREFIX, UNKNOWN_ERROR } from "../shared/errors";
+import { sendGenerateMessage } from "../shared/messaging";
 
 export async function generateComments(state: ContentState): Promise<void> {
   if (state.isLoading || !state.resultLayer) return;
@@ -25,7 +26,7 @@ export async function generateComments(state: ContentState): Promise<void> {
   try {
     const base64Images = await convertImagesToBase64(state.currentImages);
 
-    const response = await chrome.runtime.sendMessage({
+    const response = await sendGenerateMessage({
       type: "generate",
       text: state.currentText,
       images: base64Images,
@@ -33,11 +34,12 @@ export async function generateComments(state: ContentState): Promise<void> {
       generationMode: isMulti ? "multi" : "single",
     });
 
+    // Discriminated union: narrow on `ok`, then on `multiData` presence.
     if (!response.ok) {
       renderError(body, response.error || `${GENERATION_FAILED_PREFIX}${UNKNOWN_ERROR}`, () => generateComments(state));
-    } else if (isMulti && response.multiData) {
+    } else if ("multiData" in response) {
       renderMultiComments(body, response.multiData);
-    } else if (!isMulti && response.data?.comments?.length) {
+    } else if (response.data.comments.length > 0) {
       renderComments(body, response.data);
     } else {
       renderError(body, "没有生成评论", () => generateComments(state));

@@ -1,7 +1,7 @@
 import { loadSettings } from "../shared/storage";
 import { callWithImageFallback } from "../shared/api";
 import { errorFromResponse, GENERATION_FAILED_PREFIX, UNKNOWN_ERROR } from "../shared/errors";
-import type { GenerateResponse, MultiPresetResult, Settings } from "../shared/types";
+import type { GenerateRequest, GenerateResponse, MultiPresetResult, Settings } from "../shared/types";
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "generate") {
@@ -15,12 +15,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 });
 
-async function handleMessage(message: {
-  text: string;
-  images: string[];
-  presetIds: string[];
-  generationMode: "single" | "multi";
-}): Promise<GenerateResponse> {
+async function handleMessage(message: GenerateRequest): Promise<GenerateResponse> {
   const settings = await loadSettings();
 
   if (!settings.apiKey) {
@@ -68,10 +63,12 @@ async function handleMultiMode(
           } as MultiPresetResult;
         }
 
+        // response.ok narrowed; single-mode variant carries `data`.
+        const result = "data" in response ? response.data : { translation: null, comments: [] };
         return {
           presetId,
           presetName,
-          result: response.data || { translation: null, comments: [] },
+          result,
         } as MultiPresetResult;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
