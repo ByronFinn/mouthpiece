@@ -1,6 +1,7 @@
 import type { Settings, ApiResult, GenerateResponse, Comment } from "./types";
 import { buildSystemPrompt, buildUserMessageText } from "./presets";
-import { mapHttpError, REQUEST_FAILED_PREFIX } from "./errors";
+import { mapHttpError, REQUEST_FAILED_PREFIX, withThinkingDisableHint } from "./errors";
+import { resolveThinkingDisableFields } from "./thinking-disable";
 
 // Re-exported for backwards compatibility — existing callers (and tests) import mapHttpError from "./api".
 export { mapHttpError };
@@ -35,7 +36,8 @@ function buildContentParts(userText: string, images: string[]): ContentPart[] {
   return parts;
 }
 
-function buildChatBody(
+/** Build chat/completions body; exported for unit tests. */
+export function buildChatBody(
   settings: Settings,
   systemPrompt: string,
   contentParts: ContentPart[],
@@ -48,11 +50,16 @@ function buildChatBody(
       { role: "user", content: contentParts },
     ],
     stream: false,
+    ...resolveThinkingDisableFields(settings),
   };
   if (useJsonObject) {
     body.response_format = { type: "json_object" };
   }
   return body;
+}
+
+function httpErrorForSettings(settings: Settings, status: number): string {
+  return withThinkingDisableHint(mapHttpError(status), status, settings.disableModelThinking);
 }
 
 async function postChatCompletion(
@@ -102,7 +109,11 @@ async function generateWithJsonMode(
       if (useJsonObject && isUnsupportedJsonObjectError(result.status)) {
         return "unsupported_json_object";
       }
-      return { ok: false, status: result.status, error: mapHttpError(result.status) };
+      return {
+        ok: false,
+        status: result.status,
+        error: httpErrorForSettings(settings, result.status),
+      };
     }
 
     const parsed = tryParseApiResult(result.raw, expectedCount);
@@ -148,21 +159,27 @@ export async function testConnection(settings: Settings): Promise<{ ok: true } |
   }
 
   try {
+    const body: Record<string, unknown> = {
+      model: settings.model,
+      messages: [{ role: "user", content: "hi" }],
+      max_tokens: 1,
+      ...resolveThinkingDisableFields(settings),
+    };
     const res = await fetch(`${normalizeBaseUrl(settings.baseUrl)}/chat/completions`, {
       method: "POST",
       headers: {
         ...authHeaders(settings.apiKey),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: settings.model,
-        messages: [{ role: "user", content: "hi" }],
-        max_tokens: 1,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      return { ok: false, error: `连接失败 (${res.status}): ${mapHttpError(res.status)}${errText ? ` — ${errText.slice(0, 120)}` : ""}` };
+      const mapped = httpErrorForSettings(settings, res.status);
+      return {
+        ok: false,
+        error: `连接失败 (${res.status}): ${mapped}${errText ? ` — ${errText.slice(0, 120)}` : ""}`,
+      };
     }
     return { ok: true };
   } catch (err: unknown) {

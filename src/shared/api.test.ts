@@ -8,9 +8,12 @@ import {
   tryParseApiResult,
   isUnsupportedJsonObjectError,
   callOpenAI,
+  buildChatBody,
+  testConnection,
 } from "./api";
 import { BUILT_IN_PRESETS } from "./presets";
 import type { Settings } from "./types";
+import { THINKING_DISABLE_PARAM_HINT } from "./errors";
 
 const baseSettings: Settings = {
   apiKey: "sk-test",
@@ -22,6 +25,9 @@ const baseSettings: Settings = {
   presets: [...BUILT_IN_PRESETS],
   selectedPresetIds: ["critic"],
   enabled: true,
+  disableModelThinking: true,
+  thinkingDisableProfile: "deepseek_glm",
+  thinkingDisableExtra: "{}",
 };
 
 function makeComment(content: string) {
@@ -144,6 +150,37 @@ describe("sanitizeApiResult", () => {
   });
 });
 
+describe("buildChatBody thinking disable", () => {
+  it("injects default deepseek_glm fields", () => {
+    const body = buildChatBody(baseSettings, "sys", [{ type: "text", text: "hi" }], true);
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.response_format).toEqual({ type: "json_object" });
+    expect(body.enable_thinking).toBeUndefined();
+  });
+
+  it("omits thinking fields when disableModelThinking is false", () => {
+    const body = buildChatBody(
+      { ...baseSettings, disableModelThinking: false },
+      "sys",
+      [{ type: "text", text: "hi" }],
+      true
+    );
+    expect(body.thinking).toBeUndefined();
+  });
+
+  it("injects openai_openrouter fields only", () => {
+    const body = buildChatBody(
+      { ...baseSettings, thinkingDisableProfile: "openai_openrouter" },
+      "sys",
+      [{ type: "text", text: "hi" }],
+      false
+    );
+    expect(body.reasoning).toEqual({ effort: "none" });
+    expect(body.reasoning_effort).toBe("none");
+    expect(body.thinking).toBeUndefined();
+  });
+});
+
 describe("callOpenAI", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -167,6 +204,35 @@ describe("callOpenAI", () => {
     expect(result.data.comments).toHaveLength(2);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body.response_format).toEqual({ type: "json_object" });
+    expect(body.thinking).toEqual({ type: "disabled" });
+  });
+
+  it("keeps thinking fields when falling back from json_object", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 400 } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => chatResponse(validPayload(2)),
+      } as Response);
+
+    await callOpenAI(baseSettings, "hello", [], "critic");
+    const fallbackBody = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(fallbackBody.response_format).toBeUndefined();
+    expect(fallbackBody.thinking).toEqual({ type: "disabled" });
+  });
+
+  it("hints to check thinking profile on non-json 400 when disable thinking is on", async () => {
+    const fetchMock = vi.mocked(fetch);
+    // json_object unsupported path then plain also 400
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 400 } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 400 } as Response);
+
+    const result = await callOpenAI(baseSettings, "hello", [], "critic");
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected failure");
+    expect(result.error).toContain(THINKING_DISABLE_PARAM_HINT);
   });
 
   it("retries once when the first json_object response is invalid", async () => {
@@ -249,5 +315,26 @@ describe("callOpenAI", () => {
     if (result.ok) throw new Error("expected failure");
     expect(result.error).toContain("请求失败：");
     expect(result.error).toContain("network down");
+  });
+});
+
+describe("testConnection", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("includes thinking disable fields from settings", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response);
+
+    await testConnection(baseSettings);
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.max_tokens).toBe(1);
   });
 });

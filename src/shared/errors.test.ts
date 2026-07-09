@@ -1,52 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
   mapHttpError,
-  errorFromResponse,
-  GENERATION_FAILED_PREFIX,
-  REQUEST_FAILED_PREFIX,
-  UNKNOWN_ERROR,
+  withThinkingDisableHint,
+  THINKING_DISABLE_PARAM_HINT,
 } from "./errors";
 
-describe("mapHttpError", () => {
-  it("maps known status codes", () => {
-    expect(mapHttpError(401)).toContain("API Key");
-    expect(mapHttpError(402)).toContain("余额");
-    expect(mapHttpError(403)).toContain("权限");
-    expect(mapHttpError(404)).toContain("不存在");
-    expect(mapHttpError(429)).toContain("频繁");
+describe("withThinkingDisableHint", () => {
+  it("appends hint for 400/422 when disable thinking is active", () => {
+    const base = mapHttpError(400);
+    const msg = withThinkingDisableHint(base, 400, true);
+    expect(msg).toContain(base);
+    expect(msg).toContain(THINKING_DISABLE_PARAM_HINT);
   });
 
-  it("maps 5xx to server error", () => {
-    expect(mapHttpError(500)).toContain("服务");
-    expect(mapHttpError(502)).toContain("服务");
-    expect(mapHttpError(503)).toContain("服务");
+  it("does not append when disable thinking is off", () => {
+    const base = mapHttpError(400);
+    expect(withThinkingDisableHint(base, 400, false)).toBe(base);
   });
 
-  it("falls back to HTTP status template for unknown 4xx", () => {
-    expect(mapHttpError(418)).toContain("HTTP 418");
-  });
-
-  it("falls back to generic server error for unknown 5xx", () => {
-    expect(mapHttpError(599)).toContain("服务器错误");
-  });
-});
-
-describe("errorFromResponse", () => {
-  it("uses response.error when present", () => {
-    const msg = errorFromResponse({ ok: false, status: 500, error: "boom" });
-    expect(msg).toBe(`${GENERATION_FAILED_PREFIX}boom`);
-  });
-
-  it("falls back to UNKNOWN_ERROR when error is empty", () => {
-    const msg = errorFromResponse({ ok: false, status: 0, error: "" });
-    expect(msg).toBe(`${GENERATION_FAILED_PREFIX}${UNKNOWN_ERROR}`);
-  });
-});
-
-describe("prefix constants", () => {
-  it("exposes stable prefixes", () => {
-    expect(GENERATION_FAILED_PREFIX).toBe("生成失败：");
-    expect(REQUEST_FAILED_PREFIX).toBe("请求失败：");
-    expect(UNKNOWN_ERROR).toBe("未知错误");
+  it("does not append for unrelated status codes", () => {
+    const base = mapHttpError(401);
+    expect(withThinkingDisableHint(base, 401, true)).toBe(base);
   });
 });

@@ -1,7 +1,23 @@
-import type { Settings, Preset } from "./types";
+import type { Settings, Preset, ThinkingDisableProfileId } from "./types";
 import { DEFAULT_SETTINGS, BUILT_IN_PRESETS } from "./presets";
+import { PRESET_THINKING_DISABLE_FIELDS } from "./thinking-disable";
 
 const STORAGE_KEY = "mouthpiece_settings";
+
+const KNOWN_THINKING_PROFILES = new Set<string>([
+  ...Object.keys(PRESET_THINKING_DISABLE_FIELDS),
+  "custom",
+]);
+
+function resolveThinkingDisableProfile(
+  stored: Partial<Settings>
+): ThinkingDisableProfileId {
+  const p = stored.thinkingDisableProfile;
+  if (typeof p === "string" && KNOWN_THINKING_PROFILES.has(p)) {
+    return p as ThinkingDisableProfileId;
+  }
+  return DEFAULT_SETTINGS.thinkingDisableProfile;
+}
 
 export async function loadSettings(): Promise<Settings> {
   const result = await chrome.storage.local.get(STORAGE_KEY);
@@ -15,6 +31,12 @@ export async function loadSettings(): Promise<Settings> {
   const hasStoredEnabledFlag = "enabled" in stored;
   const migratedEnabled = !hasStoredEnabledFlag && !!stored.apiKey;
 
+  // Missing flag → default true (disable thinking). Explicit false is preserved.
+  const disableModelThinking =
+    typeof stored.disableModelThinking === "boolean"
+      ? stored.disableModelThinking
+      : DEFAULT_SETTINGS.disableModelThinking;
+
   return {
     apiKey: stored.apiKey || "",
     baseUrl: stored.baseUrl || DEFAULT_SETTINGS.baseUrl,
@@ -25,6 +47,12 @@ export async function loadSettings(): Promise<Settings> {
     presets,
     selectedPresetIds: stored.selectedPresetIds || DEFAULT_SETTINGS.selectedPresetIds,
     enabled: migratedEnabled || !!stored.enabled,
+    disableModelThinking,
+    thinkingDisableProfile: resolveThinkingDisableProfile(stored),
+    thinkingDisableExtra:
+      typeof stored.thinkingDisableExtra === "string"
+        ? stored.thinkingDisableExtra
+        : DEFAULT_SETTINGS.thinkingDisableExtra,
   };
 }
 

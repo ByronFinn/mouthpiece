@@ -210,5 +210,9 @@ export const DEFAULT_SETTINGS: Omit<Settings, "apiKey"> = {
   selectedPresetIds: ["critic"],
   // New installs are opt-in — no content script until the user enables.
   enabled: false,
+  // Default: disable model thinking for faster comment generation (ADR 0002).
+  disableModelThinking: true,
+  thinkingDisableProfile: "deepseek_glm",
+  thinkingDisableExtra: "{}",
 };
 

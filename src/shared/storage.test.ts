@@ -86,4 +86,27 @@ describe("loadSettings enabled migration", () => {
     const s = await loadSettings();
     expect(s.enabled).toBe(false);
   });
+
+  it("defaults thinking-disable fields for legacy stored settings", async () => {
+    mockStored({ mouthpiece_settings: { apiKey: "sk-x" } });
+    const s = await loadSettings();
+    expect(s.disableModelThinking).toBe(true);
+    expect(s.thinkingDisableProfile).toBe("deepseek_glm");
+    expect(s.thinkingDisableExtra).toBe("{}");
+  });
+
+  it("preserves explicit disableModelThinking false", async () => {
+    mockStored({
+      mouthpiece_settings: {
+        apiKey: "sk-x",
+        disableModelThinking: false,
+        thinkingDisableProfile: "ollama",
+        thinkingDisableExtra: '{"think":false}',
+      },
+    });
+    const s = await loadSettings();
+    expect(s.disableModelThinking).toBe(false);
+    expect(s.thinkingDisableProfile).toBe("ollama");
+    expect(s.thinkingDisableExtra).toBe('{"think":false}');
+  });
 });

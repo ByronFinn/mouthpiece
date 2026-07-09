@@ -14,6 +14,9 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
     presets: [...BUILT_IN_PRESETS],
     selectedPresetIds: ["critic"],
     enabled: true,
+    disableModelThinking: true,
+    thinkingDisableProfile: "deepseek_glm",
+    thinkingDisableExtra: "{}",
     ...overrides,
   };
 }

@@ -8,6 +8,15 @@ export interface Preset {
 
 export type GenerationMode = "single" | "multi";
 
+/** Prefab or custom profile id for disable-thinking request fields. */
+export type ThinkingDisableProfileId =
+  | "openai_openrouter"
+  | "deepseek_glm"
+  | "qwen_cloud"
+  | "qwen_glm_local"
+  | "ollama"
+  | "custom";
+
 export interface Settings {
   apiKey: string;
   baseUrl: string;
@@ -19,6 +28,15 @@ export interface Settings {
   selectedPresetIds: string[];
   /** Master on/off switch for content-script injection. New installs default false. */
   enabled: boolean;
+  /**
+   * When true, merge resolveThinkingDisableFields into chat/completions.
+   * Default true (disable thinking for faster comment generation).
+   */
+  disableModelThinking: boolean;
+  /** Which prefab dialect (or custom) to inject when disableModelThinking is true. */
+  thinkingDisableProfile: ThinkingDisableProfileId;
+  /** JSON object text used when thinkingDisableProfile === "custom". */
+  thinkingDisableExtra: string;
 }
 
 export interface Comment {

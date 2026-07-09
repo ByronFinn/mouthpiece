@@ -22,6 +22,25 @@ export function mapHttpError(status: number): string {
   }
 }
 
+/** Hint appended when parameter-like errors occur while disable-thinking is active. */
+export const THINKING_DISABLE_PARAM_HINT =
+  "若已开启「关闭模型思考」，请检查关思考档案或自定义参数是否与当前模型匹配";
+
+/**
+ * When disable-thinking is on and the status is typically "bad request",
+ * append a guidance hint (does not auto-switch profiles).
+ */
+export function withThinkingDisableHint(
+  message: string,
+  status: number,
+  disableModelThinking: boolean
+): string {
+  if (!disableModelThinking) return message;
+  if (status !== 400 && status !== 422) return message;
+  if (message.includes(THINKING_DISABLE_PARAM_HINT)) return message;
+  return `${message}。${THINKING_DISABLE_PARAM_HINT}`;
+}
+
 /** Type alias for the failure variant of GenerateResponse (where `error` is required). */
 type FailedResponse = Extract<GenerateResponse, { ok: false }>;
 
