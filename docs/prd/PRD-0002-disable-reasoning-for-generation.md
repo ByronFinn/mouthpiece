@@ -185,8 +185,7 @@ function resolveThinkingDisableFields(settings: Settings): Record<string, unknow
   - #18 — [PRD-0002] 关思考字段解析与请求注入 — 默认档案接通生成与测试连接 (AFK) — Done
   - #19 — [PRD-0002] 设置页主开关与档案 UI — 切换档案并持久化 (AFK, blocked by #18) — Done
   - #20 — [PRD-0002] 自定义关思考 JSON 与错误提示 — 二级配置与说明 (AFK, blocked by #19) — Done
-- **Implemented by**: `/implement` (2026-07-09)
-- **Implemented by**: —
+- **Implemented by**: `/implement` (2026-07-09) — #18–#20
 - **Reviewed by**: —
 - **New terms**: disableModelThinking, thinkingDisableProfile, thinkingDisableExtra
 - **New decisions**: ADR 0002
