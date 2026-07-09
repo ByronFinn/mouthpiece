@@ -121,7 +121,28 @@ Use the "Translation as Rewriting" (精译重写) approach:
 - Write translations ENTIRELY in {{translation_lang}}. Do not mix languages except untranslatable proper nouns.
 - Preserve tone, humor, and emotional nuance.`;
 
-export function buildSystemPrompt(userPrompt: string, translationLang: string, count: number): string {
+/** Local wall-clock time as `YYYY-MM-DD HH:mm:ss` for prompt context. */
+export function formatLocalDateTime(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
+
+function buildContextSection(now: Date = new Date()): string {
+  return `
+
+## Context
+Current local time: ${formatLocalDateTime(now)}. Use this when the post refers to relative time (today, this morning, season, holidays) or when a timely tone helps — do not force time references into every comment.`;
+}
+
+export function buildSystemPrompt(
+  userPrompt: string,
+  translationLang: string,
+  count: number,
+  now: Date = new Date()
+): string {
   const formatted = userPrompt
     .replace(/\{\{count\}\}/g, String(count))
     .replace(/\{\{translation_lang\}\}/g, translationLang);
@@ -141,6 +162,7 @@ export function buildSystemPrompt(userPrompt: string, translationLang: string, c
     .replace(/\{\{translation_lang\}\}/g, translationLang);
 
   // Static sections first (prompt caching), variable sections last.
+  // Context (current time) is fully dynamic — always last.
   return (
     SYSTEM_SECURITY_RULES +
     "\n\n" +
@@ -149,7 +171,8 @@ export function buildSystemPrompt(userPrompt: string, translationLang: string, c
     SHARED_TASK_RULES +
     formattedLanguageRules +
     formattedTranslationRules +
-    formattedOutputFormat
+    formattedOutputFormat +
+    buildContextSection(now)
   );
 }
 

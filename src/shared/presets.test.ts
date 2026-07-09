@@ -2,8 +2,16 @@ import { describe, it, expect } from "vitest";
 import {
   buildSystemPrompt,
   buildUserMessageText,
+  formatLocalDateTime,
   BUILT_IN_PRESETS,
 } from "./presets";
+
+describe("formatLocalDateTime", () => {
+  it("formats as YYYY-MM-DD HH:mm:ss with zero padding", () => {
+    const date = new Date(2026, 0, 9, 3, 5, 7); // local: 2026-01-09 03:05:07
+    expect(formatLocalDateTime(date)).toBe("2026-01-09 03:05:07");
+  });
+});
 
 describe("buildSystemPrompt", () => {
   it("places static sections before variable sections", () => {
@@ -14,12 +22,14 @@ describe("buildSystemPrompt", () => {
     const languageIdx = prompt.indexOf("## Language");
     const translationIdx = prompt.indexOf("## Translation rules");
     const outputIdx = prompt.indexOf("## Output format");
+    const contextIdx = prompt.indexOf("## Context");
 
     expect(securityIdx).toBeLessThan(personaIdx);
     expect(personaIdx).toBeLessThan(imagesIdx);
     expect(imagesIdx).toBeLessThan(languageIdx);
     expect(languageIdx).toBeLessThan(translationIdx);
     expect(translationIdx).toBeLessThan(outputIdx);
+    expect(outputIdx).toBeLessThan(contextIdx);
   });
 
   it("substitutes template variables", () => {
@@ -28,6 +38,26 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("exactly 5 objects");
     expect(prompt).toContain("into English");
     expect(prompt).toContain("write comments in English");
+  });
+
+  it("injects current local datetime at the end by default", () => {
+    const fixed = new Date(2026, 6, 9, 14, 30, 45); // 2026-07-09 14:30:45
+    const prompt = buildSystemPrompt(
+      BUILT_IN_PRESETS[0].systemPrompt,
+      "中文",
+      3,
+      fixed
+    );
+    expect(prompt).toContain("## Context");
+    expect(prompt).toContain("Current local time: 2026-07-09 14:30:45.");
+    expect(prompt.indexOf("## Context")).toBeGreaterThan(
+      prompt.indexOf("## Output format")
+    );
+    // Default call (no now) still injects a YYYY-MM-DD HH:mm:ss stamp
+    const live = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 1);
+    expect(live).toMatch(
+      /Current local time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\./
+    );
   });
 
   it("includes image guidance and shared rules for all presets", () => {
@@ -40,6 +70,7 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("## Output format");
       expect(prompt).toContain("visible image content");
       expect(prompt).toContain("exactly 2 objects");
+      expect(prompt).toContain("## Context");
     }
   });
 
