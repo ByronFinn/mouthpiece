@@ -1,6 +1,6 @@
 # 生成请求关闭模型思考（档案 + 自定义）
 
-> **Status**: In Progress | **PRD**: PRD-0002 | **Created**: 2026-07-09 | **Last updated**: 2026-07-09
+> **Status**: Done | **PRD**: PRD-0002 | **Created**: 2026-07-09 | **Last updated**: 2026-07-09
 
 ## Goal
 
@@ -186,7 +186,7 @@ function resolveThinkingDisableFields(settings: Settings): Record<string, unknow
   - #19 — [PRD-0002] 设置页主开关与档案 UI — 切换档案并持久化 (AFK, blocked by #18) — Done
   - #20 — [PRD-0002] 自定义关思考 JSON 与错误提示 — 二级配置与说明 (AFK, blocked by #19) — Done
 - **Implemented by**: `/implement` (2026-07-09) — #18–#20
-- **Reviewed by**: —
+- **Reviewed by**: `/review` (2026-07-09) — Comments 放行；默认档案 vs OpenAI baseUrl 为已知代价
 - **New terms**: disableModelThinking, thinkingDisableProfile, thinkingDisableExtra
 - **New decisions**: ADR 0002
 

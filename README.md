@@ -49,6 +49,7 @@ You can also create custom presets via the Settings page.
 - **Output sanitization** — detects prompt leakage in AI responses
 - **Smart image fallback** — if the model doesn't support vision, silently retries without images
 - **Robust JSON parsing** — direct parse → code block extraction → bracket matching
+- **Disable model thinking** — by default the extension injects vendor-specific “no thinking” params for faster comments. Default profile is **DeepSeek / 智谱 GLM**. If you use **OpenAI / OpenRouter**, open Settings and switch the thinking profile (or turn off “关闭模型思考”). Custom JSON is available for other gateways.
 
 ### Install
 
@@ -115,6 +116,7 @@ ISC
 
 - **无需后端** — 插件直接调用 OpenAI 兼容 API
 - **自带 Key** — 使用你自己的 API Key（OpenAI 或任意兼容端点）
+- **关闭模型思考（加速）** — 默认开启，按「关思考档案」注入对应参数（默认档案为 **DeepSeek / 智谱 GLM**）。若使用 **OpenAI / OpenRouter**，请在设置中改选对应档案，或关闭主开关。其它网关可用自定义 JSON。
 
 ### 安装
 
