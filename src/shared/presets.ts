@@ -54,8 +54,8 @@ Comment bilingual rules:
 - Do not set "translation" to null merely because comments[].content already looks like {{translation_lang}}.
 
 Short examples (JSON fields, not style):
-- Selection English, {{translation_lang}}=中文 → content in English + translation in 中文 (non-null).
-- Forbidden: selection English but content only in 中文 with translation null.
+- Selection English, target {{translation_lang}} → content in English + non-null translation in {{translation_lang}}.
+- Forbidden: selection English but content only in {{translation_lang}} with translation null.
 
 The "comments" array MUST contain exactly {{count}} objects.
 Each comment must be meaningfully different from the others.`;
