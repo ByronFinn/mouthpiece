@@ -80,6 +80,83 @@ describe("buildSystemPrompt", () => {
       expect(preset.systemPrompt).toContain("[image:");
     }
   });
+
+  it("requires comment content in selection language and forbids rewriting into translationLang", () => {
+    for (const preset of BUILT_IN_PRESETS) {
+      const prompt = buildSystemPrompt(preset.systemPrompt, "中文", 3);
+      expect(prompt).toContain(
+        "write each comments[].content in the SAME language and register as the selection (original text)"
+      );
+      expect(prompt).toContain("Never rewrite comment content into 中文 just because that is the translation target");
+      expect(prompt).toContain(
+        "中文 is for translation fields only, not for comments[].content when the selection has text"
+      );
+    }
+  });
+
+  it("requires non-null comment translation when selection language differs from translationLang", () => {
+    const prompt = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 2);
+    expect(prompt).toContain(
+      "null only if the selection (original) language matches 中文"
+    );
+    expect(prompt).toContain(
+      "if the selection language differs from 中文, translation MUST be a non-empty string"
+    );
+    expect(prompt).toContain("never null based on the content field alone");
+    expect(prompt).toContain(
+      'When the selection language differs from 中文, every comment\'s "translation" MUST be non-empty'
+    );
+    expect(prompt).toContain(
+      'Do not set "translation" to null merely because comments[].content already looks like 中文'
+    );
+    // Bad null criterion (content-based) must not appear
+    expect(prompt).not.toContain("null if the content language matches");
+    expect(prompt).not.toContain("null if content is already in");
+  });
+
+  it("still allows null comment translation when selection language matches translationLang", () => {
+    const zh = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 1);
+    expect(zh).toContain(
+      'When the selection language matches 中文, each comment\'s "translation" may be null'
+    );
+
+    const en = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "English", 1);
+    expect(en).toContain(
+      "null only if the selection (original) language matches English"
+    );
+    expect(en).toContain(
+      'When the selection language matches English, each comment\'s "translation" may be null'
+    );
+  });
+
+  it("locks shared bilingual short examples and translation omit rule", () => {
+    const prompt = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 1);
+    expect(prompt).toContain(
+      "Selection English, target 中文 → content in English + non-null translation in 中文."
+    );
+    expect(prompt).toContain(
+      "Forbidden: selection English but content only in 中文 with translation null."
+    );
+    expect(prompt).toContain(
+      "when the selection language differs from 中文, do not omit the comment translation"
+    );
+  });
+
+  it("keeps post-level translation as optional summary of the full post", () => {
+    const prompt = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 1);
+    expect(prompt).toContain("summary of the full post");
+    expect(prompt).toContain(
+      "or null if the post is already entirely in 中文 with nothing meaningful to summarize"
+    );
+  });
+
+  it("does not rewrite built-in persona examples into JSON bilingual fields", () => {
+    for (const preset of BUILT_IN_PRESETS) {
+      expect(preset.systemPrompt).toContain("## Examples");
+      expect(preset.systemPrompt).not.toMatch(/"content"\s*:\s*"/);
+      expect(preset.systemPrompt).toContain("Comment:");
+    }
+  });
 });
 
 describe("buildUserMessageText", () => {

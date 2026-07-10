@@ -29,7 +29,8 @@ The user message may include images after the text part. Treat them as integral 
 const INPUT_LANGUAGE_RULES = `
 
 ## Language
-- With text: write comments in the SAME language and register as the text (e.g. 中文口语 stays 中文口语).
+- With text: write each comments[].content in the SAME language and register as the selection (original text) — e.g. 中文口语 stays 中文口语; English stays English.
+- Never rewrite comment content into {{translation_lang}} just because that is the translation target. {{translation_lang}} is for translation fields only, not for comments[].content when the selection has text.
 - Image-only (no text): use the language of visible text in the image; if none, write comments in {{translation_lang}}.
 - Comments must feel native in their chosen language — not translated word-for-word.`;
 
@@ -41,11 +42,20 @@ Return ONLY valid JSON — no markdown, no code fences, no text before or after:
   "translation": "idiomatic {{translation_lang}} summary of the full post (text and/or visible image content), or null if the post is already entirely in {{translation_lang}} with nothing meaningful to summarize",
   "comments": [
     {
-      "content": "comment in the SAME language as the original text",
-      "translation": "idiomatic translation of the comment into {{translation_lang}}, or null if the original text language matches {{translation_lang}}"
+      "content": "comment in the SAME language as the selection (original text)",
+      "translation": "idiomatic translation of the comment into {{translation_lang}}; null only if the selection (original) language matches {{translation_lang}}; if the selection language differs from {{translation_lang}}, translation MUST be a non-empty string — never null based on the content field alone"
     }
   ]
 }
+
+Comment bilingual rules:
+- When the selection language matches {{translation_lang}}, each comment's "translation" may be null.
+- When the selection language differs from {{translation_lang}}, every comment's "translation" MUST be non-empty (even if content was wrongly written in {{translation_lang}}).
+- Do not set "translation" to null merely because comments[].content already looks like {{translation_lang}}.
+
+Short examples (JSON fields, not style):
+- Selection English, target {{translation_lang}} → content in English + non-null translation in {{translation_lang}}.
+- Forbidden: selection English but content only in {{translation_lang}} with translation null.
 
 The "comments" array MUST contain exactly {{count}} objects.
 Each comment must be meaningfully different from the others.`;
@@ -119,7 +129,8 @@ Use the "Translation as Rewriting" (精译重写) approach:
 - Eradicate translationese: no passive-voice overuse, redundant conjunctions, or stacked abstract nouns.
 - The result must read as if originally written by a {{translation_lang}} native — fluent, idiomatic, publishable.
 - Write translations ENTIRELY in {{translation_lang}}. Do not mix languages except untranslatable proper nouns.
-- Preserve tone, humor, and emotional nuance.`;
+- Preserve tone, humor, and emotional nuance.
+- Each comments[].translation rewrites that comment's content for the reader; when the selection language differs from {{translation_lang}}, do not omit the comment translation.`;
 
 /** Local wall-clock time as `YYYY-MM-DD HH:mm:ss` for prompt context. */
 export function formatLocalDateTime(date: Date = new Date()): string {
