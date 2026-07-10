@@ -1,6 +1,6 @@
 # 生成结果始终双语（原文语言 + 中文）
 
-> **Status**: In Progress | **PRD**: PRD-0003 | **Created**: 2026-07-10 | **Last updated**: 2026-07-10
+> **Status**: Done | **PRD**: PRD-0003 | **Created**: 2026-07-10 | **Last updated**: 2026-07-10
 
 ## Goal
 
@@ -130,7 +130,7 @@
 - **Implemented by**: `/implement` (2026-07-10) — #22
 - **Debugged by**: —
 - **Arch reviewed by**: —
-- **Reviewed by**: —
+- **Reviewed by**: `/review` (2026-07-10) — 三视角 Approve（初审 Comments 后收紧契约测试 re-review Approve）；83 tests + lint + typecheck + build green
 - **New terms**: 原始语言、目标翻译语言、帖子译文、评论文本、评论译文、双语评论结果
 - **New decisions**: 见 Decision (ADR-lite)；无独立 ADR 文件
 
