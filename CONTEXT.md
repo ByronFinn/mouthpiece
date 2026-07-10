@@ -27,6 +27,12 @@ Chrome Extension (MV3)
 - **关闭模型思考（disableModelThinking）**：用户主开关，默认开启。开启时按所选**关思考档案**向请求体注入关闭/压低思考的参数；关闭时不注入，保留模型默认推理行为。
 - **关思考档案（thinkingDisableProfile）**：预制或自定义的一组请求字段，对应某一类模型/网关的关思考写法（如 OpenAI/OpenRouter、DeepSeek/GLM、Qwen 本地、Ollama、自定义）。一次只应用一个档案，不叠加全量方言。
 - **关思考自定义参数（thinkingDisableExtra）**：二级配置。档案为「自定义」时，用户提供的 JSON 对象，合并进 `/chat/completions` 请求体。设置页须附简短填写说明与示例。
+- **原始语言（source language）**：选中文本（或图中可见文字）的主语言；由模型根据选区判定，客户端不做语种检测。
+- **目标翻译语言（translationLang）**：设置项，默认「中文」。帖子译文与评论译文使用此语言；Prompt 变量为 `{{translation_lang}}`。
+- **帖子译文（post translation）**：`ApiResult.translation`。整帖在目标翻译语言下的意译/摘要；选区已是目标语言时可 null。**不是**评论本身。
+- **评论文本（comment content）**：`comments[].content`。可复制发帖的评论，语言须与**原始语言**一致（不得因目标翻译语言而改写成中文等）。
+- **评论译文（comment translation）**：`comments[].translation`。该条评论在目标翻译语言下的意译。仅当**原始语言**与 `translationLang` 一致时可 null；跨语言时须非空。结果层有译文时双行展示。
+- **双语评论结果**：跨语言选区下，同一评论同时具备评论文本（原始语言）与评论译文（目标翻译语言）。仅靠 Prompt 约束，客户端不校验字段/语种（已知限制）。
 
 ## 项目结构
 
@@ -107,9 +113,14 @@ Background → Content：
 
 ```json
 {
-  "translation": "translated text (null if same language)",
+  "translation": "帖子译文：整帖的目标翻译语言意译/摘要（选区已是目标语言时可 null）",
   "comments": [
-    { "content": "comment in target lang", "translation": "translated comment (null if same)" }
+    {
+      "content": "评论文本：与选区原始语言相同的可发帖评论",
+      "translation": "评论译文：目标翻译语言意译（仅当选区原始语言 = translationLang 时可 null；跨语言须非空）"
+    }
   ]
 }
 ```
+
+语言策略摘要：有文本时评论用原始语言；`translationLang` 只约束译文侧。跨语言选区期望双语评论结果；同语言允许仅评论文本一行。纯图无可见文字时评论默认用 `translationLang`。客户端不检测语种、不校验 translation 是否非空（依赖模型服从）。

@@ -80,6 +80,55 @@ describe("buildSystemPrompt", () => {
       expect(preset.systemPrompt).toContain("[image:");
     }
   });
+
+  it("requires comment content in selection language and forbids rewriting into translationLang", () => {
+    const prompt = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 3);
+    expect(prompt).toMatch(/SAME language.*selection|selection.*SAME language|original (text|selection)/i);
+    expect(prompt).toMatch(
+      /must not|never|do not|forbidden|禁止/i
+    );
+    // Must not tell the model to write post comments in translationLang when text is present
+    expect(prompt).toContain("中文");
+    expect(prompt).toMatch(
+      /(?:do not|never|must not).{0,80}(?:rewrite|write).{0,40}(?:comments?|content).{0,60}(?:translation.?lang|中文|target)/is
+    );
+  });
+
+  it("requires non-null comment translation when selection language differs from translationLang", () => {
+    const prompt = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 2);
+    // null only when selection/original language matches translation target
+    expect(prompt).toMatch(
+      /null only if (?:the )?(?:selection|original).{0,40}(?:language )?matches/i
+    );
+    expect(prompt).toMatch(
+      /(?:selection|original).{0,40}(?:differs|different|does not match).{0,80}(?:must|MUST).{0,20}(?:non-empty|not null|nonnull)/is
+    );
+    // Must not allow null merely because content already matches translationLang
+    expect(prompt).not.toMatch(
+      /null if (?:the )?(?:comment )?content(?:'s)? language matches/i
+    );
+  });
+
+  it("still allows null comment translation when selection language matches translationLang", () => {
+    const prompt = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "English", 1);
+    expect(prompt).toMatch(
+      /null only if (?:the )?(?:selection|original).{0,40}(?:language )?matches.{0,20}English/i
+    );
+  });
+
+  it("keeps post-level translation as optional summary of the full post", () => {
+    const prompt = buildSystemPrompt(BUILT_IN_PRESETS[0].systemPrompt, "中文", 1);
+    expect(prompt).toContain("summary of the full post");
+    expect(prompt).toMatch(/or null if the post is already entirely in 中文/i);
+  });
+
+  it("does not rewrite built-in persona examples into JSON bilingual fields", () => {
+    for (const preset of BUILT_IN_PRESETS) {
+      expect(preset.systemPrompt).toContain("## Examples");
+      expect(preset.systemPrompt).not.toMatch(/"content"\s*:\s*"/);
+      expect(preset.systemPrompt).toMatch(/Comment:/);
+    }
+  });
 });
 
 describe("buildUserMessageText", () => {
